@@ -19,6 +19,7 @@ struct ContentView: View {
     @State private var showingImporter = false
     @State private var showingPrinterSetup = false
     @State private var showingPrintHistory = false
+    @State private var showingPrintables = false
     @State private var columnVisibility = NavigationSplitViewVisibility.all
     @State private var errorMessage: String?
     @State private var showingError = false
@@ -106,6 +107,12 @@ struct ContentView: View {
             ToolbarItem(placement: .primaryAction) {
                 HStack(spacing: 12) {
                     Button {
+                        showingPrintables = true
+                    } label: {
+                        Label("Printables", systemImage: "globe")
+                    }
+
+                    Button {
                         showingPrintHistory = true
                     } label: {
                         Label("History", systemImage: "clock.arrow.circlepath")
@@ -118,6 +125,9 @@ struct ContentView: View {
                     }
                 }
             }
+        }
+        .sheet(isPresented: $showingPrintables) {
+            PrintablesBrowseView()
         }
         .sheet(isPresented: $showingPrinterSetup) {
             PrinterManagementView()

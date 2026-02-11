@@ -794,3 +794,284 @@ struct DiscoveredPrinterTests {
         #expect(DiscoveredPrinter.DiscoveryMethod.manual.rawValue == "Manual")
     }
 }
+
+// MARK: - Printables Model Tests
+
+struct PrintablesModelTests {
+
+    @Test func searchResultDecoding() throws {
+        let json = """
+        {
+            "id": "12345",
+            "name": "3DBenchy",
+            "image": {
+                "filePath": "/media/prints/12345/thumb.jpg",
+                "rotation": 0
+            },
+            "nsfw": false,
+            "hasModel": true,
+            "liked": null,
+            "likesCount": 500,
+            "downloadCount": 10000,
+            "datePublished": "2023-06-14"
+        }
+        """.data(using: .utf8)!
+
+        let result = try JSONDecoder().decode(PrintablesSearchResult.self, from: json)
+        #expect(result.id == "12345")
+        #expect(result.name == "3DBenchy")
+        #expect(result.image.filePath == "/media/prints/12345/thumb.jpg")
+        #expect(result.image.rotation == 0)
+        #expect(result.nsfw == false)
+        #expect(result.hasModel == true)
+        #expect(result.liked == nil)
+        #expect(result.likesCount == 500)
+        #expect(result.downloadCount == 10000)
+        #expect(result.datePublished == "2023-06-14")
+    }
+
+    @Test func searchResultImageURL() throws {
+        let json = """
+        {
+            "id": "1",
+            "name": "Test",
+            "image": { "filePath": "/media/prints/1/img.jpg", "rotation": 0 },
+            "nsfw": false,
+            "hasModel": true,
+            "liked": null,
+            "likesCount": 0,
+            "downloadCount": 0,
+            "datePublished": "2024-01-01"
+        }
+        """.data(using: .utf8)!
+
+        let result = try JSONDecoder().decode(PrintablesSearchResult.self, from: json)
+        #expect(result.image.imageURL?.absoluteString == "https://media.printables.com/media/prints/1/img.jpg")
+    }
+
+    @Test func modelDetailDecoding() throws {
+        let json = """
+        {
+            "id": "99",
+            "name": "Vase",
+            "images": [
+                { "id": "1", "filePath": "/media/img1.jpg", "rotation": 0 },
+                { "id": "2", "filePath": "/media/img2.jpg", "rotation": 90 }
+            ],
+            "nsfw": false,
+            "hasModel": true,
+            "liked": true,
+            "likesCount": 42,
+            "downloadCount": 100,
+            "makesCount": 15,
+            "datePublished": "2024-03-01",
+            "summary": "A beautiful vase",
+            "description": "<p>Print this vase</p>",
+            "user": {
+                "id": "7",
+                "publicUsername": "maker42",
+                "avatarFilePath": "/media/avatar.jpg",
+                "handle": "maker42"
+            },
+            "tags": [
+                { "id": "1", "name": "vase" },
+                { "id": "2", "name": "decoration" }
+            ],
+            "stls": [
+                {
+                    "id": "s1",
+                    "name": "vase.stl",
+                    "filePath": "/media/prints/99/stls/vase.stl",
+                    "fileSize": 512000,
+                    "filePreviewPath": "/media/prints/99/stls/preview.png"
+                }
+            ],
+            "gcodes": [],
+            "slas": [],
+            "category": {
+                "id": "44",
+                "path": [
+                    { "id": "3", "name": "Household" },
+                    { "id": "44", "name": "Home Decor" }
+                ]
+            },
+            "license": {
+                "id": "1",
+                "name": "Creative Commons",
+                "disallowRemixing": false
+            }
+        }
+        """.data(using: .utf8)!
+
+        let detail = try JSONDecoder().decode(PrintablesModelDetail.self, from: json)
+        #expect(detail.id == "99")
+        #expect(detail.name == "Vase")
+        #expect(detail.images?.count == 2)
+        #expect(detail.likesCount == 42)
+        #expect(detail.downloadCount == 100)
+        #expect(detail.makesCount == 15)
+        #expect(detail.summary == "A beautiful vase")
+        #expect(detail.description == "<p>Print this vase</p>")
+        #expect(detail.user?.publicUsername == "maker42")
+        #expect(detail.user?.handle == "maker42")
+        #expect(detail.tags?.count == 2)
+        #expect(detail.stls?.count == 1)
+        #expect(detail.stls?.first?.name == "vase.stl")
+        #expect(detail.stls?.first?.fileSize == 512000)
+        #expect(detail.gcodes?.isEmpty == true)
+        #expect(detail.slas?.isEmpty == true)
+        #expect(detail.category?.path?.count == 2)
+        #expect(detail.license?.name == "Creative Commons")
+        #expect(detail.license?.disallowRemixing == false)
+    }
+
+    @Test func printablesFileURLs() throws {
+        let json = """
+        {
+            "id": "f1",
+            "name": "part.stl",
+            "filePath": "/media/prints/100/stls/part.stl",
+            "fileSize": 1048576,
+            "filePreviewPath": "/media/prints/100/stls/preview.png"
+        }
+        """.data(using: .utf8)!
+
+        let file = try JSONDecoder().decode(PrintablesFile.self, from: json)
+        #expect(file.downloadURL?.absoluteString == "https://media.printables.com/media/prints/100/stls/part.stl")
+        #expect(file.formattedFileSize == "1 MB")
+        #expect(file.fileExtension == "stl")
+    }
+
+    @Test func printablesUserAvatarURL() throws {
+        let json = """
+        {
+            "id": "5",
+            "publicUsername": "TestUser",
+            "avatarFilePath": "/media/avatars/test.jpg",
+            "handle": "testuser"
+        }
+        """.data(using: .utf8)!
+
+        let user = try JSONDecoder().decode(PrintablesUser.self, from: json)
+        #expect(user.avatarURL?.absoluteString == "https://media.printables.com/media/avatars/test.jpg")
+        #expect(user.publicUsername == "TestUser")
+    }
+
+    @Test func printablesOrderingValues() {
+        #expect(PrintablesOrdering.allCases.count == 5)
+        #expect(PrintablesOrdering.bestMatch.rawValue == "Best Match")
+        #expect(PrintablesOrdering.latest.rawValue == "Newest")
+        #expect(PrintablesOrdering.popular.rawValue == "Popular")
+        #expect(PrintablesOrdering.makesCount.rawValue == "Most Makes")
+        #expect(PrintablesOrdering.rating.rawValue == "Top Rated")
+    }
+
+    @Test func graphQLValueEncoding() throws {
+        let encoder = JSONEncoder()
+
+        // String
+        let strData = try encoder.encode(GraphQLValue.string("test"))
+        #expect(String(data: strData, encoding: .utf8) == "\"test\"")
+
+        // Int
+        let intData = try encoder.encode(GraphQLValue.int(42))
+        #expect(String(data: intData, encoding: .utf8) == "42")
+
+        // Bool
+        let boolData = try encoder.encode(GraphQLValue.bool(true))
+        #expect(String(data: boolData, encoding: .utf8) == "true")
+
+        // Null
+        let nullData = try encoder.encode(GraphQLValue.null)
+        #expect(String(data: nullData, encoding: .utf8) == "null")
+    }
+
+    @Test func graphQLResponseDecoding() throws {
+        let json = """
+        {
+            "data": {
+                "searchPrints": {
+                    "items": []
+                }
+            },
+            "errors": null
+        }
+        """.data(using: .utf8)!
+
+        let response = try JSONDecoder().decode(GraphQLResponse<SearchPrintsData>.self, from: json)
+        #expect(response.data != nil)
+        #expect(response.data?.searchPrints.items.isEmpty == true)
+        #expect(response.errors == nil)
+    }
+
+    @Test func graphQLErrorResponseDecoding() throws {
+        let json = """
+        {
+            "data": null,
+            "errors": [
+                { "message": "Something went wrong" }
+            ]
+        }
+        """.data(using: .utf8)!
+
+        let response = try JSONDecoder().decode(GraphQLResponse<SearchPrintsData>.self, from: json)
+        #expect(response.data == nil)
+        #expect(response.errors?.count == 1)
+        #expect(response.errors?.first?.message == "Something went wrong")
+    }
+
+    @Test func printablesErrorDescriptions() {
+        let errors: [(PrintablesService.PrintablesError, String)] = [
+            (.invalidURL, "Invalid Printables API URL"),
+            (.networkError("timeout"), "Network error: timeout"),
+            (.graphQLError("bad query"), "Printables API error: bad query"),
+            (.decodingError("missing field"), "Failed to decode response: missing field"),
+            (.noData, "No data returned from Printables"),
+            (.downloadFailed("404"), "File download failed: 404"),
+        ]
+
+        for (error, expected) in errors {
+            #expect(error.errorDescription == expected)
+        }
+    }
+
+    @Test func searchResultsResponseDecoding() throws {
+        let json = """
+        {
+            "data": {
+                "searchPrints": {
+                    "items": [
+                        {
+                            "id": "1",
+                            "name": "Benchy",
+                            "image": { "filePath": "/img.jpg", "rotation": 0 },
+                            "nsfw": false,
+                            "hasModel": true,
+                            "liked": null,
+                            "likesCount": 100,
+                            "downloadCount": 500,
+                            "datePublished": "2024-01-01"
+                        },
+                        {
+                            "id": "2",
+                            "name": "Calibration Cube",
+                            "image": { "filePath": "/img2.jpg", "rotation": 0 },
+                            "nsfw": false,
+                            "hasModel": true,
+                            "liked": null,
+                            "likesCount": 50,
+                            "downloadCount": 200,
+                            "datePublished": "2024-02-01"
+                        }
+                    ]
+                }
+            }
+        }
+        """.data(using: .utf8)!
+
+        let response = try JSONDecoder().decode(GraphQLResponse<SearchPrintsData>.self, from: json)
+        #expect(response.data?.searchPrints.items.count == 2)
+        #expect(response.data?.searchPrints.items[0].name == "Benchy")
+        #expect(response.data?.searchPrints.items[1].name == "Calibration Cube")
+    }
+}
