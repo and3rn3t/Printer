@@ -9,7 +9,7 @@
 /* Begin PBXBuildFile section */
 		3D32AD532F3D215E00E45052 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3D32AD522F3D215E00E45052 /* WidgetKit.framework */; };
 		3D32AD552F3D215E00E45052 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3D32AD542F3D215E00E45052 /* SwiftUI.framework */; };
-		3D32AD662F3D215F00E45052 /* widgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 3D32AD502F3D215E00E45052 /* widgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		3D32AD662F3D215F00E45052 /* widgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 3D32AD502F3D215E00E45052 /* widgetExtension.appex */; platformFilter = ios; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -60,7 +60,7 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		3D32AD6A2F3D215F00E45052 /* Exceptions for "widget" folder in "widgetExtension" target */ = {
+		3D32AD702F3D220000E45052 /* Exceptions for "widget" folder in "widgetExtension" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
@@ -80,7 +80,7 @@
 		3D32AD562F3D215E00E45052 /* widget */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				3D32AD6A2F3D215F00E45052 /* Exceptions for "widget" folder in "widgetExtension" target */,
+				3D32AD702F3D220000E45052 /* Exceptions for "widget" folder in "widgetExtension" target */,
 			);
 			path = widget;
 			sourceTree = "<group>";
@@ -379,6 +379,7 @@
 /* Begin PBXTargetDependency section */
 		3D32AD652F3D215F00E45052 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
+			platformFilter = ios;
 			target = 3D32AD4F2F3D215E00E45052 /* widgetExtension */;
 			targetProxy = 3D32AD642F3D215F00E45052 /* PBXContainerItemProxy */;
 		};
@@ -419,6 +420,7 @@
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG WIDGET_EXTENSION $(inherited)";
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
@@ -451,6 +453,7 @@
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "WIDGET_EXTENSION $(inherited)";
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;

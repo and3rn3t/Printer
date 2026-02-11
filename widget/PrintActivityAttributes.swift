@@ -6,7 +6,6 @@
 //
 
 import Foundation
-#if os(iOS)
 import ActivityKit
 
 /// Live Activity attributes for tracking an active print job
@@ -39,4 +38,3 @@ struct PrintActivityAttributes: ActivityAttributes {
     /// Printer protocol in use
     var printerProtocol: String
 }
-#endif

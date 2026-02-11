@@ -22,13 +22,14 @@
         "*.xcscheme": "xml"
     },
 
-    // Exclude build artifacts and Xcode noise from explorer/search
+    // Exclude build artifacts, Xcode noise, and separate targets from explorer/search
     "files.exclude": {
         "**/.DS_Store": true,
         "**/DerivedData": true,
         "**/*.xcodeproj/xcuserdata": true,
         "**/*.xcworkspace/xcuserdata": true,
-        "**/.build": true
+        "**/.build": true,
+        "widget": true
     },
     "search.exclude": {
         "**/DerivedData": true,
