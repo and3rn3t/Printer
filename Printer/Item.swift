@@ -11,7 +11,7 @@ import SwiftData
 /// Represents a 3D model that can be printed
 @Model
 final class PrintModel {
-    var id: UUID
+    @Attribute(.unique) var id: UUID
     var name: String
     var createdDate: Date
     var modifiedDate: Date
@@ -64,7 +64,7 @@ enum ModelSource: Codable {
 /// Represents a print job sent to a printer
 @Model
 final class PrintJob {
-    var id: UUID
+    @Attribute(.unique) var id: UUID
     var startDate: Date
     var endDate: Date?
     var status: PrintStatus
@@ -95,7 +95,7 @@ enum PrintStatus: Codable {
 /// Represents a connected 3D printer
 @Model
 final class Printer {
-    var id: UUID
+    @Attribute(.unique) var id: UUID
     var name: String
     var ipAddress: String
     var apiKey: String?

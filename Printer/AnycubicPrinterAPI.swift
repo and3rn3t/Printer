@@ -163,7 +163,7 @@ actor AnycubicPrinterAPI {
             request.setValue(apiKey, forHTTPHeaderField: "X-Api-Key")
         }
         
-        let command = ["command": "select", "print": true]
+        let command: [String: Any] = ["command": "select", "print": true]
         request.httpBody = try JSONSerialization.data(withJSONObject: command)
         
         let (_, response) = try await urlSession.data(for: request)

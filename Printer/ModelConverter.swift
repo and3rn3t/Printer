@@ -76,7 +76,7 @@ actor ModelConverter {
     
     /// Generate thumbnail from 3D model
     func generateThumbnail(from modelURL: URL, size: CGSize = CGSize(width: 200, height: 200)) async throws -> Data? {
-        return await withCheckedContinuation { continuation in
+        return await withCheckedContinuation { (continuation: CheckedContinuation<Data?, Never>) in
             // Create a SCNScene from the model
             let scene: SCNScene
             
@@ -89,9 +89,12 @@ actor ModelConverter {
             } else if modelURL.pathExtension.lowercased() == "stl" {
                 // Load STL using ModelIO
                 let asset = MDLAsset(url: modelURL)
+                
+                // Create an empty scene and manually add the MDLAsset objects
                 scene = SCNScene()
                 
-                for object in asset.childObjects(of: MDLObject.self) {
+                for index in 0..<asset.count {
+                    guard let object = asset.object(at: index) as? MDLMesh else { continue }
                     let node = SCNNode(mdlObject: object)
                     scene.rootNode.addChildNode(node)
                 }
@@ -120,12 +123,10 @@ actor ModelConverter {
             // Render to image
             #if os(macOS)
             let image = renderer.snapshot(atTime: 0, with: size, antialiasingMode: .multisampling4X)
-            let data = image.tiffRepresentation
-            continuation.resume(returning: data)
+            continuation.resume(returning: image.tiffRepresentation)
             #else
             let image = renderer.snapshot(atTime: 0, with: size, antialiasingMode: .multisampling4X)
-            let data = image.pngData()
-            continuation.resume(returning: data)
+            continuation.resume(returning: image.pngData())
             #endif
         }
     }

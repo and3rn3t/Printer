@@ -118,4 +118,12 @@ extension UTType {
     static var stl: UTType {
         UTType(filenameExtension: "stl") ?? .data
     }
+    
+    static var obj: UTType {
+        UTType(filenameExtension: "obj") ?? .threeDContent
+    }
+    
+    static var usdz: UTType {
+        UTType(filenameExtension: "usdz") ?? .usdz
+    }
 }

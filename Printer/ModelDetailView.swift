@@ -18,40 +18,72 @@ struct ModelDetailView: View {
     
     var body: some View {
         ScrollView {
-            VStack(spacing: 20) {
-                // Thumbnail
-                if let thumbnailData = model.thumbnailData {
+            VStack(spacing: 24) {
+                // Hero Thumbnail Section
+                ZStack(alignment: .bottomTrailing) {
+                    Group {
+                        if let thumbnailData = model.thumbnailData {
 #if os(macOS)
-                    if let nsImage = NSImage(data: thumbnailData) {
-                        Image(nsImage: nsImage)
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .frame(maxHeight: 300)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                    }
+                            if let nsImage = NSImage(data: thumbnailData) {
+                                Image(nsImage: nsImage)
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fit)
+                            }
 #else
-                    if let uiImage = UIImage(data: thumbnailData) {
-                        Image(uiImage: uiImage)
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .frame(maxHeight: 300)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                    }
+                            if let uiImage = UIImage(data: thumbnailData) {
+                                Image(uiImage: uiImage)
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fit)
+                            }
 #endif
-                } else {
-                    Image(systemName: "cube")
-                        .font(.system(size: 100))
-                        .foregroundStyle(.secondary)
-                        .frame(height: 200)
+                        } else {
+                            ZStack {
+                                LinearGradient(
+                                    colors: [.blue.opacity(0.4), .purple.opacity(0.4)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                                
+                                VStack(spacing: 12) {
+                                    Image(systemName: "cube.transparent")
+                                        .font(.system(size: 80))
+                                        .foregroundStyle(.white)
+                                    
+                                    Text("No Preview")
+                                        .font(.headline)
+                                        .foregroundStyle(.white.opacity(0.8))
+                                }
+                            }
+                            .frame(height: 300)
+                        }
+                    }
+                    .frame(maxHeight: 400)
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .shadow(color: .black.opacity(0.15), radius: 10, y: 5)
+                    
+                    // Source badge
+                    HStack(spacing: 6) {
+                        Image(systemName: sourceIcon(for: model.source))
+                            .font(.caption)
+                        Text(sourceText(for: model.source))
+                            .font(.caption)
+                            .fontWeight(.medium)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(.ultraThinMaterial, in: Capsule())
+                    .padding(12)
                 }
+                .padding(.horizontal)
                 
-                // Model info
-                VStack(spacing: 12) {
-                    // Name
+                // Model info card
+                VStack(spacing: 16) {
+                    // Name editing
                     if isEditingName {
                         TextField("Model Name", text: $model.name)
                             .textFieldStyle(.roundedBorder)
                             .font(.title2)
+                            .fontWeight(.bold)
                             .onSubmit {
                                 isEditingName = false
                                 model.modifiedDate = Date()
@@ -60,13 +92,16 @@ struct ModelDetailView: View {
                         HStack {
                             Text(model.name)
                                 .font(.title2)
-                                .bold()
+                                .fontWeight(.bold)
+                            
+                            Spacer()
                             
                             Button {
                                 isEditingName = true
                             } label: {
-                                Image(systemName: "pencil")
-                                    .font(.caption)
+                                Image(systemName: "pencil.circle.fill")
+                                    .font(.title3)
+                                    .foregroundStyle(.blue)
                             }
                             .buttonStyle(.plain)
                         }
@@ -74,36 +109,51 @@ struct ModelDetailView: View {
                     
                     Divider()
                     
-                    // Metadata
-                    LabeledContent("File Size") {
-                        Text(ByteCountFormatter.string(fromByteCount: model.fileSize, countStyle: .file))
-                    }
-                    
-                    LabeledContent("Source") {
-                        HStack {
-                            Image(systemName: sourceIcon(for: model.source))
-                            Text(sourceText(for: model.source))
+                    // Metadata grid
+                    VStack(spacing: 12) {
+                        InfoRow(
+                            icon: "doc.fill",
+                            label: "File Size",
+                            value: ByteCountFormatter.string(fromByteCount: model.fileSize, countStyle: .file)
+                        )
+                        
+                        InfoRow(
+                            icon: "calendar",
+                            label: "Created",
+                            value: model.createdDate.formatted(date: .abbreviated, time: .shortened)
+                        )
+                        
+                        InfoRow(
+                            icon: "clock.fill",
+                            label: "Modified",
+                            value: model.modifiedDate.formatted(date: .abbreviated, time: .shortened)
+                        )
+                        
+                        if !model.printJobs.isEmpty {
+                            InfoRow(
+                                icon: "printer.fill",
+                                label: "Print Jobs",
+                                value: "\(model.printJobs.count)"
+                            )
                         }
-                    }
-                    
-                    LabeledContent("Created") {
-                        Text(model.createdDate.formatted(date: .abbreviated, time: .shortened))
-                    }
-                    
-                    LabeledContent("Modified") {
-                        Text(model.modifiedDate.formatted(date: .abbreviated, time: .shortened))
                     }
                     
                     Divider()
                     
-                    // Notes
+                    // Notes section
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Notes")
-                            .font(.headline)
+                        HStack {
+                            Image(systemName: "note.text")
+                                .foregroundStyle(.blue)
+                            Text("Notes")
+                                .font(.headline)
+                        }
                         
                         TextEditor(text: $model.notes)
                             .frame(minHeight: 100)
-                            .border(Color.secondary.opacity(0.2))
+                            .padding(8)
+                            .background(Color(.systemGray6))
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
                             .onChange(of: model.notes) { _, _ in
                                 model.modifiedDate = Date()
                             }
@@ -111,48 +161,72 @@ struct ModelDetailView: View {
                 }
                 .padding()
                 .background {
-                    RoundedRectangle(cornerRadius: 12)
+                    RoundedRectangle(cornerRadius: 16)
                         .fill(.background)
-                        .shadow(radius: 2)
+                        .shadow(color: .black.opacity(0.05), radius: 8, y: 4)
                 }
+                .padding(.horizontal)
                 
                 // Print history
                 if !model.printJobs.isEmpty {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Print History")
-                            .font(.headline)
+                    VStack(alignment: .leading, spacing: 16) {
+                        HStack {
+                            Image(systemName: "clock.arrow.circlepath")
+                                .foregroundStyle(.blue)
+                            Text("Print History")
+                                .font(.headline)
+                        }
+                        .padding(.horizontal)
                         
-                        ForEach(model.printJobs) { job in
-                            PrintJobRowView(job: job)
+                        VStack(spacing: 12) {
+                            ForEach(model.printJobs) { job in
+                                PrintJobRowView(job: job)
+                            }
                         }
                     }
                     .padding()
-                    .frame(maxWidth: .infinity, alignment: .leading)
                     .background {
-                        RoundedRectangle(cornerRadius: 12)
+                        RoundedRectangle(cornerRadius: 16)
                             .fill(.background)
-                            .shadow(radius: 2)
+                            .shadow(color: .black.opacity(0.05), radius: 8, y: 4)
+                    }
+                    .padding(.horizontal)
+                }
+                
+                // Action button
+                VStack(spacing: 12) {
+                    Button {
+                        showingPrintSheet = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "printer.fill")
+                                .font(.headline)
+                            Text("Send to Printer")
+                                .font(.headline)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(printers.isEmpty ? Color.gray : Color.blue)
+                        .foregroundStyle(.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .shadow(color: printers.isEmpty ? .clear : .blue.opacity(0.3), radius: 8, y: 4)
+                    }
+                    .disabled(printers.isEmpty)
+                    
+                    if printers.isEmpty {
+                        HStack(spacing: 6) {
+                            Image(systemName: "info.circle.fill")
+                                .font(.caption)
+                            Text("Add a printer to start printing")
+                                .font(.caption)
+                        }
+                        .foregroundStyle(.secondary)
                     }
                 }
-                
-                // Print button
-                Button {
-                    showingPrintSheet = true
-                } label: {
-                    Label("Send to Printer", systemImage: "printer.fill")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-                .disabled(printers.isEmpty)
-                
-                if printers.isEmpty {
-                    Text("Add a printer to start printing")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
+                .padding(.horizontal)
+                .padding(.bottom)
             }
-            .padding()
+            .padding(.vertical)
         }
         .navigationTitle(model.name)
 #if os(macOS)
@@ -166,8 +240,8 @@ struct ModelDetailView: View {
     private func sourceIcon(for source: ModelSource) -> String {
         switch source {
         case .scanned: return "camera.fill"
-        case .imported: return "square.and.arrow.down"
-        case .downloaded: return "arrow.down.circle"
+        case .imported: return "square.and.arrow.down.fill"
+        case .downloaded: return "arrow.down.circle.fill"
         }
     }
     
@@ -180,19 +254,53 @@ struct ModelDetailView: View {
     }
 }
 
+// MARK: - Info Row Component
+
+struct InfoRow: View {
+    let icon: String
+    let label: String
+    let value: String
+    
+    var body: some View {
+        HStack {
+            Label {
+                Text(label)
+                    .foregroundStyle(.secondary)
+            } icon: {
+                Image(systemName: icon)
+                    .foregroundStyle(.blue)
+            }
+            
+            Spacer()
+            
+            Text(value)
+                .fontWeight(.medium)
+        }
+    }
+}
+
 // MARK: - Print Job Row
 
 struct PrintJobRowView: View {
     let job: PrintJob
     
     var body: some View {
-        HStack {
-            Image(systemName: statusIcon)
-                .foregroundStyle(statusColor)
+        HStack(spacing: 12) {
+            // Status icon
+            ZStack {
+                Circle()
+                    .fill(statusColor.opacity(0.2))
+                    .frame(width: 44, height: 44)
+                
+                Image(systemName: statusIcon)
+                    .font(.headline)
+                    .foregroundStyle(statusColor)
+            }
             
             VStack(alignment: .leading, spacing: 4) {
                 Text(job.printerName)
                     .font(.subheadline)
+                    .fontWeight(.medium)
                 
                 Text(job.startDate.formatted(date: .abbreviated, time: .shortened))
                     .font(.caption)
@@ -201,25 +309,28 @@ struct PrintJobRowView: View {
             
             Spacer()
             
+            // Status badge
             Text(statusText)
                 .font(.caption)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(statusColor.opacity(0.2))
+                .fontWeight(.medium)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(statusColor.opacity(0.15))
+                .foregroundStyle(statusColor)
                 .clipShape(Capsule())
         }
-        .padding()
+        .padding(12)
         .background {
-            RoundedRectangle(cornerRadius: 8)
-                .fill(.background.secondary)
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(.systemGray6))
         }
     }
     
     private var statusIcon: String {
         switch job.status {
-        case .preparing: return "clock"
-        case .uploading: return "arrow.up.circle"
-        case .queued: return "tray"
+        case .preparing: return "clock.fill"
+        case .uploading: return "arrow.up.circle.fill"
+        case .queued: return "tray.fill"
         case .printing: return "printer.fill"
         case .completed: return "checkmark.circle.fill"
         case .failed: return "xmark.circle.fill"
