@@ -222,7 +222,7 @@ actor PhotonPrinterService {
     ///
     /// Response format: `command,value1,value2,...,end`
     /// Returns the values between the command echo and "end"
-    private nonisolated func parseResponse(_ raw: String) -> [String] {
+    nonisolated func parseResponse(_ raw: String) -> [String] {
         let cleaned =
             raw
             .replacingOccurrences(of: "\r\n", with: "")
