@@ -175,7 +175,9 @@ struct SettingsView: View {
                     }
                     ProgressView(value: rescanProgress)
                         .tint(.blue)
+                        .animation(.easeInOut(duration: 0.3), value: rescanProgress)
                 }
+                .transition(.opacity)
             } else {
                 Button {
                     rescanLibrary()

@@ -7,17 +7,21 @@
 
 import SwiftUI
 import SwiftData
+import Charts
 
 /// Browsable list of all print jobs across all printers.
 ///
 /// Supports filtering by status and sorting by date. Shows duration, printer name,
-/// file name, and status badges for each job.
+/// file name, status badges, and interactive charts for each job.
 struct PrintHistoryView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \PrintJob.startDate, order: .reverse) private var allJobs: [PrintJob]
 
     @State private var statusFilter: StatusFilter = .all
     @State private var searchText = ""
+    @State private var chartRange: ChartRange = .month
+
+    // MARK: - Filter Types
 
     enum StatusFilter: String, CaseIterable {
         case all = "All"
@@ -34,6 +38,50 @@ struct PrintHistoryView: View {
             }
         }
     }
+
+    enum ChartRange: String, CaseIterable {
+        case week = "7 Days"
+        case month = "30 Days"
+        case year = "Year"
+
+        var days: Int {
+            switch self {
+            case .week: return 7
+            case .month: return 30
+            case .year: return 365
+            }
+        }
+
+        var startDate: Date {
+            Calendar.current.date(byAdding: .day, value: -days, to: Date()) ?? .distantPast
+        }
+
+        /// Calendar component used for grouping dates in charts
+        var groupingComponent: Calendar.Component {
+            switch self {
+            case .week, .month: return .day
+            case .year: return .month
+            }
+        }
+    }
+
+    // MARK: - Chart Data Types
+
+    struct DailyPrintData: Identifiable {
+        let id = UUID()
+        let date: Date
+        let status: String
+        let count: Int
+        let color: Color
+    }
+
+    struct DurationData: Identifiable {
+        let id = UUID()
+        let date: Date
+        let hours: Double
+    }
+
+    // MARK: - Computed Properties
 
     var filteredJobs: [PrintJob] {
         var jobs = allJobs
@@ -63,6 +111,68 @@ struct PrintHistoryView: View {
         return jobs
     }
 
+    /// Jobs within the selected chart time range
+    private var chartJobs: [PrintJob] {
+        allJobs.filter { $0.startDate >= chartRange.startDate }
+    }
+
+    /// Activity data grouped by date and status for the stacked bar chart
+    private var activityData: [DailyPrintData] {
+        let calendar = Calendar.current
+        let component = chartRange.groupingComponent
+
+        let grouped = Dictionary(grouping: chartJobs) { job in
+            calendar.dateInterval(of: component, for: job.startDate)?.start ?? job.startDate
+        }
+
+        var result: [DailyPrintData] = []
+        for (date, jobs) in grouped {
+            let completed = jobs.filter { $0.status == .completed }.count
+            let failed = jobs.filter { $0.status == .failed || $0.status == .cancelled }.count
+            let other = jobs.count - completed - failed
+
+            if completed > 0 {
+                result.append(DailyPrintData(date: date, status: "Completed", count: completed, color: .green))
+            }
+            if failed > 0 {
+                result.append(DailyPrintData(date: date, status: "Failed", count: failed, color: .red))
+            }
+            if other > 0 {
+                result.append(DailyPrintData(date: date, status: "Other", count: other, color: .orange))
+            }
+        }
+
+        return result.sorted { $0.date < $1.date }
+    }
+
+    /// Print duration data grouped by date for the duration chart
+    private var durationData: [DurationData] {
+        let calendar = Calendar.current
+        let component = chartRange.groupingComponent
+
+        let grouped = Dictionary(grouping: chartJobs) { job in
+            calendar.dateInterval(of: component, for: job.startDate)?.start ?? job.startDate
+        }
+
+        return grouped.map { date, jobs in
+            let totalHours = jobs.reduce(0.0) { $0 + $1.effectiveDuration } / 3600.0
+            return DurationData(date: date, hours: totalHours)
+        }
+        .sorted { $0.date < $1.date }
+    }
+
+    /// Success rate as a percentage (0–100)
+    private var successRate: Double {
+        let finished = allJobs.filter {
+            $0.status == .completed || $0.status == .failed || $0.status == .cancelled
+        }
+        guard !finished.isEmpty else { return 0 }
+        let completed = finished.filter { $0.status == .completed }.count
+        return Double(completed) / Double(finished.count) * 100
+    }
+
+    // MARK: - Body
+
     var body: some View {
         Group {
             if allJobs.isEmpty {
@@ -75,6 +185,9 @@ struct PrintHistoryView: View {
                 List {
                     // Summary section
                     summarySection
+
+                    // Charts section
+                    chartsSection
 
                     // Jobs list
                     Section {
@@ -100,7 +213,9 @@ struct PrintHistoryView: View {
                 Menu {
                     ForEach(StatusFilter.allCases, id: \.self) { filter in
                         Button {
-                            statusFilter = filter
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                statusFilter = filter
+                            }
                         } label: {
                             Label(filter.rawValue, systemImage: filter.icon)
                         }
@@ -137,6 +252,15 @@ struct PrintHistoryView: View {
                     .frame(height: 40)
 
                 summaryStat(
+                    value: String(format: "%.0f%%", successRate),
+                    label: "Success",
+                    color: successRate >= 80 ? .green : (successRate >= 50 ? .orange : .red)
+                )
+
+                Divider()
+                    .frame(height: 40)
+
+                summaryStat(
                     value: totalPrintTime,
                     label: "Print Time",
                     color: .purple
@@ -162,6 +286,108 @@ struct PrintHistoryView: View {
     private var totalPrintTime: String {
         let total = allJobs.reduce(0.0) { $0 + $1.effectiveDuration }
         return formatDuration(total)
+    }
+
+    // MARK: - Charts
+
+    @ViewBuilder
+    private var chartsSection: some View {
+        Section {
+            VStack(alignment: .leading, spacing: 16) {
+                // Time range picker
+                Picker("Range", selection: $chartRange.animation(.easeInOut(duration: 0.3))) {
+                    ForEach(ChartRange.allCases, id: \.self) { range in
+                        Text(range.rawValue).tag(range)
+                    }
+                }
+                .pickerStyle(.segmented)
+
+                // Activity chart — stacked bar showing prints per day/month by status
+                if !activityData.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Label("Print Activity", systemImage: "chart.bar.fill")
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+
+                        Chart(activityData) { item in
+                            BarMark(
+                                x: .value("Date", item.date, unit: chartRange.groupingComponent),
+                                y: .value("Prints", item.count)
+                            )
+                            .foregroundStyle(by: .value("Status", item.status))
+                        }
+                        .chartForegroundStyleScale([
+                            "Completed": Color.green,
+                            "Failed": Color.red,
+                            "Other": Color.orange
+                        ])
+                        .chartLegend(position: .bottom, spacing: 12)
+                        .chartYAxis {
+                            AxisMarks(preset: .aligned) { _ in
+                                AxisGridLine()
+                                AxisValueLabel()
+                            }
+                        }
+                        .frame(height: 180)
+                    }
+                }
+
+                // Duration chart — total print hours per day/month
+                if !durationData.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Label("Print Duration", systemImage: "clock.fill")
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+
+                        Chart(durationData) { item in
+                            AreaMark(
+                                x: .value("Date", item.date, unit: chartRange.groupingComponent),
+                                y: .value("Hours", item.hours)
+                            )
+                            .foregroundStyle(
+                                .linearGradient(
+                                    colors: [.purple.opacity(0.6), .purple.opacity(0.1)],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+                            .interpolationMethod(.catmullRom)
+
+                            LineMark(
+                                x: .value("Date", item.date, unit: chartRange.groupingComponent),
+                                y: .value("Hours", item.hours)
+                            )
+                            .foregroundStyle(.purple)
+                            .interpolationMethod(.catmullRom)
+                        }
+                        .chartYAxis {
+                            AxisMarks(preset: .aligned) { value in
+                                AxisGridLine()
+                                AxisValueLabel {
+                                    if let hours = value.as(Double.self) {
+                                        Text(String(format: "%.1fh", hours))
+                                    }
+                                }
+                            }
+                        }
+                        .frame(height: 150)
+                    }
+                }
+
+                // Empty state for charts
+                if activityData.isEmpty {
+                    ContentUnavailableView {
+                        Label("No Activity", systemImage: "chart.bar")
+                    } description: {
+                        Text("No prints in the selected time range")
+                    }
+                    .frame(height: 120)
+                }
+            }
+            .padding(.vertical, 4)
+        } header: {
+            Text("Charts")
+        }
     }
 
     // MARK: - Actions

@@ -22,6 +22,7 @@ struct ContentView: View {
     @State private var showingPrintables = false
     @State private var showingSettings = false
     @State private var showingPrintQueue = false
+    @State private var showingStatistics = false
     @State private var columnVisibility = NavigationSplitViewVisibility.all
     @State private var errorMessage: String?
     @State private var showingError = false
@@ -38,6 +39,7 @@ struct ContentView: View {
                 showingPrinterSetup: $showingPrinterSetup,
                 showingSettings: $showingSettings,
                 showingPrintQueue: $showingPrintQueue,
+                showingStatistics: $showingStatistics,
                 onDelete: deleteModels
             )
         } detail: {
@@ -133,6 +135,16 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showingPrintQueue) {
             PrintQueueView()
+        }
+        .sheet(isPresented: $showingStatistics) {
+            NavigationStack {
+                StatisticsView()
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("Done") { showingStatistics = false }
+                        }
+                    }
+            }
         }
         .alert("Error", isPresented: $showingError) {
             Button("OK", role: .cancel) { }
@@ -287,6 +299,7 @@ struct ModelListView: View {
     @Binding var showingPrinterSetup: Bool
     @Binding var showingSettings: Bool
     @Binding var showingPrintQueue: Bool
+    @Binding var showingStatistics: Bool
     let onDelete: (IndexSet) -> Void
 
     @AppStorage("defaultSortOption") private var sortOptionRaw = "Date (Newest)"
@@ -530,6 +543,14 @@ struct ModelListView: View {
                     showingPrintHistory = true
                 } label: {
                     Label("History", systemImage: "clock.arrow.circlepath")
+                }
+            }
+
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    showingStatistics = true
+                } label: {
+                    Label("Statistics", systemImage: "chart.bar.fill")
                 }
             }
 

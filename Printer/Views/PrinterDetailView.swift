@@ -18,6 +18,7 @@ struct PrinterDetailView: View {
     @State private var manager = PrinterConnectionManager()
     @State private var controlError: String?
     @State private var showingControlError = false
+    @State private var showingEditPrinter = false
 
     /// Recent jobs for this printer
     private var recentJobs: [PrintJob] {
@@ -102,9 +103,23 @@ struct PrinterDetailView: View {
             connectionDetailsSection
         }
         .navigationTitle(printer.name)
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    showingEditPrinter = true
+                } label: {
+                    Label("Edit", systemImage: "pencil.circle")
+                }
+            }
+        }
+        .sheet(isPresented: $showingEditPrinter) {
+            EditPrinterView(printer: printer)
+        }
         .refreshable {
             await manager.refresh()
         }
+        .animation(.easeInOut(duration: 0.3), value: manager.connectionState.isConnected)
+        .animation(.easeInOut(duration: 0.3), value: manager.photonStatus?.displayText)
         .onAppear {
             manager.modelContext = modelContext
             manager.startMonitoring(printer)
@@ -320,6 +335,7 @@ struct PrinterDetailView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     ProgressView(value: progress)
                         .tint(progressColor(for: progress * 100))
+                        .animation(.easeInOut(duration: 0.5), value: progress)
 
                     HStack {
                         Text("\(Int(progress * 100))% estimated")

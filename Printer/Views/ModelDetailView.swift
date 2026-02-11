@@ -23,14 +23,28 @@ struct ModelDetailView: View {
     @State private var showingDeleteConfirm = false
     @State private var showingTagEditor = false
     @State private var newTag = ""
+    @State private var show3DPreview = false
+    
+    /// Whether this model supports interactive 3D preview
+    private var canShow3D: Bool {
+        let ext = model.fileURL.components(separatedBy: ".").last?.lowercased() ?? ""
+        return ["stl", "obj", "usdz", "usda", "usdc"].contains(ext)
+    }
     
     var body: some View {
         ScrollView {
             VStack(spacing: 24) {
-                // Hero Thumbnail Section
+                // Hero Thumbnail / 3D Preview Section
                 ZStack(alignment: .bottomTrailing) {
                     Group {
-                        if let thumbnailData = model.thumbnailData {
+                        if show3DPreview && canShow3D {
+                            Model3DPreviewView(
+                                fileURL: model.resolvedFileURL,
+                                fileType: model.fileType
+                            )
+                            .frame(height: 350)
+                            .transition(.opacity)
+                        } else if let thumbnailData = model.thumbnailData {
 #if os(macOS)
                             if let nsImage = NSImage(data: thumbnailData) {
                                 Image(nsImage: nsImage)
@@ -69,17 +83,39 @@ struct ModelDetailView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 16))
                     .shadow(color: .black.opacity(0.15), radius: 10, y: 5)
                     
-                    // Source badge
-                    HStack(spacing: 6) {
-                        Image(systemName: model.source.icon)
-                            .font(.caption)
-                        Text(model.source.displayText)
-                            .font(.caption)
-                            .fontWeight(.medium)
+                    // Source badge + 3D toggle
+                    HStack(spacing: 8) {
+                        if canShow3D {
+                            Button {
+                                withAnimation(.easeInOut(duration: 0.3)) {
+                                    show3DPreview.toggle()
+                                }
+                            } label: {
+                                HStack(spacing: 4) {
+                                    Image(systemName: show3DPreview ? "photo" : "cube")
+                                        .font(.caption)
+                                    Text(show3DPreview ? "2D" : "3D")
+                                        .font(.caption)
+                                        .fontWeight(.medium)
+                                }
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .background(.ultraThinMaterial, in: Capsule())
+                            }
+                            .buttonStyle(.plain)
+                        }
+
+                        HStack(spacing: 6) {
+                            Image(systemName: model.source.icon)
+                                .font(.caption)
+                            Text(model.source.displayText)
+                                .font(.caption)
+                                .fontWeight(.medium)
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(.ultraThinMaterial, in: Capsule())
                     }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(.ultraThinMaterial, in: Capsule())
                     .padding(12)
                 }
                 .padding(.horizontal)
@@ -113,8 +149,11 @@ struct ModelDetailView: View {
                             .textFieldStyle(.roundedBorder)
                             .font(.title2)
                             .fontWeight(.bold)
+                            .transition(.move(edge: .top).combined(with: .opacity))
                             .onSubmit {
-                                isEditingName = false
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    isEditingName = false
+                                }
                                 model.modifiedDate = Date()
                             }
                     } else {
@@ -126,7 +165,9 @@ struct ModelDetailView: View {
                             Spacer()
                             
                             Button {
-                                isEditingName = true
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    isEditingName = true
+                                }
                             } label: {
                                 Image(systemName: "pencil.circle.fill")
                                     .font(.title3)
@@ -134,6 +175,7 @@ struct ModelDetailView: View {
                             }
                             .buttonStyle(.plain)
                         }
+                        .transition(.move(edge: .top).combined(with: .opacity))
                     }
                     
                     Divider()
@@ -279,10 +321,19 @@ struct ModelDetailView: View {
                     HStack {
                         Image(systemName: model.isFavorite ? "star.fill" : "star")
                             .foregroundStyle(model.isFavorite ? .yellow : .gray)
+                            .symbolEffect(.bounce, value: model.isFavorite)
+                            .contentTransition(.symbolEffect(.replace))
                         Text("Favorite")
                             .font(.headline)
                         Spacer()
-                        Toggle("", isOn: $model.isFavorite)
+                        Toggle("", isOn: Binding(
+                            get: { model.isFavorite },
+                            set: { newValue in
+                                withAnimation(.spring(response: 0.35, dampingFraction: 0.6)) {
+                                    model.isFavorite = newValue
+                                }
+                            }
+                        ))
                             .labelsHidden()
                     }
 
@@ -579,7 +630,9 @@ struct FlowLayoutTags: View {
                     Text(tag)
                         .font(.caption)
                     Button {
-                        onRemove(tag)
+                        withAnimation(.easeInOut(duration: 0.25)) {
+                            onRemove(tag)
+                        }
                     } label: {
                         Image(systemName: "xmark.circle.fill")
                             .font(.caption2)
@@ -591,6 +644,7 @@ struct FlowLayoutTags: View {
                 .background(Color.blue.opacity(0.1))
                 .foregroundStyle(.blue)
                 .clipShape(Capsule())
+                .transition(.scale.combined(with: .opacity))
             }
         }
     }
