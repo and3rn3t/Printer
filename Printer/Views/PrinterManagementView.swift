@@ -92,43 +92,148 @@ struct PrinterManagementView: View {
 
 struct PrinterRowView: View {
     @Bindable var printer: Printer
-    
+    @State private var liveStatus: PhotonPrinterService.PhotonStatus?
+    @State private var isReachable: Bool?
+    @State private var checkTask: Task<Void, Never>?
+
     var body: some View {
         HStack {
+            // Status indicator
+            ZStack {
+                Circle()
+                    .fill(statusColor.opacity(0.2))
+                    .frame(width: 32, height: 32)
+
+                Image(systemName: statusIcon)
+                    .font(.system(size: 14))
+                    .foregroundStyle(statusColor)
+            }
+
             VStack(alignment: .leading, spacing: 4) {
                 Text(printer.name)
                     .font(.headline)
-                
+
                 Text(printer.ipAddress)
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                
+
                 if !printer.model.isEmpty {
                     Text("\(printer.manufacturer) \(printer.model)")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
             }
-            
+
             Spacer()
-            
-            VStack(alignment: .trailing) {
+
+            VStack(alignment: .trailing, spacing: 4) {
                 HStack(spacing: 4) {
                     Circle()
-                        .fill(printer.isConnected ? Color.green : Color.gray)
+                        .fill(connectionDotColor)
                         .frame(width: 8, height: 8)
-                    
-                    Text(printer.isConnected ? "Connected" : "Offline")
+
+                    Text(connectionText)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-                
-                if let lastConnected = printer.lastConnected {
-                    Text("Last: \(lastConnected.formatted(.relative(presentation: .named)))")
+
+                if let status = liveStatus {
+                    Text(status.displayText)
+                        .font(.caption2)
+                        .fontWeight(.medium)
+                        .foregroundStyle(iconColor(for: status))
+                } else if let lastConnected = printer.lastConnected {
+                    Text(lastConnected.formatted(.relative(presentation: .named)))
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
             }
+        }
+        .onAppear {
+            startQuickCheck()
+        }
+        .onDisappear {
+            checkTask?.cancel()
+        }
+    }
+
+    // MARK: - Quick Connection Check
+
+    private func startQuickCheck() {
+        checkTask?.cancel()
+        checkTask = Task {
+            // Quick probe to update row status
+            if printer.printerProtocol == .act {
+                let service = PhotonPrinterService()
+                if let status = try? await service.getStatus(
+                    ipAddress: printer.ipAddress,
+                    port: printer.port
+                ) {
+                    await MainActor.run {
+                        liveStatus = status
+                        isReachable = true
+                        printer.isConnected = true
+                    }
+                } else {
+                    await MainActor.run {
+                        isReachable = false
+                        printer.isConnected = false
+                    }
+                }
+            } else {
+                let api = AnycubicPrinterAPI()
+                let reachable = await api.isReachable(ipAddress: printer.ipAddress)
+                await MainActor.run {
+                    isReachable = reachable
+                    printer.isConnected = reachable
+                }
+            }
+        }
+    }
+
+    // MARK: - Computed Properties
+
+    private var statusColor: Color {
+        guard let status = liveStatus else {
+            if isReachable == true { return .green }
+            if isReachable == false { return .gray }
+            return .gray.opacity(0.5)
+        }
+        return iconColor(for: status)
+    }
+
+    private var statusIcon: String {
+        guard let status = liveStatus else {
+            if isReachable == nil { return "circle.dotted" }
+            return isReachable == true ? "checkmark.circle" : "xmark.circle"
+        }
+        switch status {
+        case .idle: return "checkmark.circle"
+        case .printing: return "printer.fill"
+        case .paused: return "pause.circle"
+        case .stopping: return "stop.circle"
+        case .unknown: return "questionmark.circle"
+        }
+    }
+
+    private var connectionDotColor: Color {
+        if isReachable == true { return .green }
+        if isReachable == false { return .gray }
+        return .orange // checking
+    }
+
+    private var connectionText: String {
+        if isReachable == nil { return "Checking…" }
+        return isReachable == true ? "Online" : "Offline"
+    }
+
+    private func iconColor(for status: PhotonPrinterService.PhotonStatus) -> Color {
+        switch status {
+        case .idle: return .green
+        case .printing: return .blue
+        case .paused: return .orange
+        case .stopping: return .red
+        case .unknown: return .gray
         }
     }
 }
@@ -464,284 +569,5 @@ struct PrinterDiscoveryView: View {
         case .anycubicACT: return "network"
         case .manual: return "hand.tap"
         }
-    }
-}
-
-// MARK: - Printer Detail
-
-struct PrinterDetailView: View {
-    @Bindable var printer: Printer
-    @State private var printerStatus: PrinterStatus?
-    @State private var jobStatus: PrintJobStatus?
-    @State private var isLoadingStatus = false
-    @State private var statusError: Error?
-    @State private var autoRefreshTask: Task<Void, Never>?
-    @State private var controlError: String?
-    @State private var showingControlError = false
-    
-    var body: some View {
-        Form {
-            Section("Information") {
-                LabeledContent("Name", value: printer.name)
-                LabeledContent("IP Address", value: printer.ipAddress)
-                LabeledContent("Manufacturer", value: printer.manufacturer)
-                if !printer.model.isEmpty {
-                    LabeledContent("Model", value: printer.model)
-                }
-                if let serial = printer.serialNumber {
-                    LabeledContent("Serial", value: serial)
-                }
-                if let firmware = printer.firmwareVersion {
-                    LabeledContent("Firmware", value: firmware)
-                }
-            }
-            
-            Section("Status") {
-                if isLoadingStatus {
-                    HStack {
-                        ProgressView()
-                        Text("Loading status...")
-                    }
-                } else if let status = printerStatus {
-                    LabeledContent("State", value: status.state.text)
-                    
-                    if let name = status.printerName {
-                        LabeledContent("Printer", value: name)
-                    }
-                    
-                    if let temp = status.temperature {
-                        if let bed = temp.bed {
-                            LabeledContent("Bed Temperature") {
-                                Text("\(Int(bed.actual))°C / \(Int(bed.target))°C")
-                            }
-                        }
-                        
-                        if let tool = temp.tool0 {
-                            LabeledContent("Nozzle Temperature") {
-                                Text("\(Int(tool.actual))°C / \(Int(tool.target))°C")
-                            }
-                        }
-                    }
-                } else {
-                    Button("Refresh Status") {
-                        loadStatus()
-                    }
-                }
-                
-                if let error = statusError {
-                    Text(error.localizedDescription)
-                        .foregroundStyle(.red)
-                        .font(.caption)
-                }
-            }
-            
-            // Active print job section
-            if let job = jobStatus, job.state != "Operational" {
-                Section("Current Print") {
-                    if let file = job.job?.file?.name {
-                        LabeledContent("File", value: file)
-                    }
-                    
-                    LabeledContent("State", value: job.state)
-                    
-                    if let progress = job.progress {
-                        if let completion = progress.completion {
-                            VStack(alignment: .leading, spacing: 4) {
-                                ProgressView(value: completion / 100.0)
-                                Text("\(Int(completion))% complete")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                        
-                        if let timeLeft = progress.printTimeLeft {
-                            LabeledContent("Time Remaining") {
-                                Text(formatDuration(timeLeft))
-                            }
-                        }
-                    }
-                    
-                    // Print controls
-                    HStack(spacing: 16) {
-                        Spacer()
-                        
-                        if job.state == "Printing" {
-                            Button {
-                                pausePrint()
-                            } label: {
-                                Label("Pause", systemImage: "pause.circle.fill")
-                            }
-                        }
-                        
-                        if job.state == "Paused" || job.state == "Pausing" {
-                            Button {
-                                resumePrint()
-                            } label: {
-                                Label("Resume", systemImage: "play.circle.fill")
-                            }
-                        }
-                        
-                        Button(role: .destructive) {
-                            cancelPrint()
-                        } label: {
-                            Label("Cancel", systemImage: "xmark.circle.fill")
-                        }
-                        
-                        Spacer()
-                    }
-                }
-            }
-            
-            if let lastConnected = printer.lastConnected {
-                Section {
-                    LabeledContent("Last Connected") {
-                        Text(lastConnected.formatted(date: .abbreviated, time: .shortened))
-                    }
-                }
-            }
-        }
-        .navigationTitle(printer.name)
-        .refreshable {
-            await refreshStatus()
-        }
-        .onAppear {
-            loadStatus()
-            startAutoRefresh()
-        }
-        .onDisappear {
-            autoRefreshTask?.cancel()
-        }
-        .alert("Printer Error", isPresented: $showingControlError) {
-            Button("OK", role: .cancel) { }
-        } message: {
-            Text(controlError ?? "An unknown error occurred.")
-        }
-    }
-    
-    // MARK: - Status Loading
-    
-    private func loadStatus() {
-        isLoadingStatus = true
-        statusError = nil
-        
-        Task {
-            await refreshStatus()
-        }
-    }
-    
-    private func refreshStatus() async {
-        do {
-            let api = AnycubicPrinterAPI()
-            let status = try await api.getPrinterStatus(
-                ipAddress: printer.ipAddress,
-                apiKey: printer.apiKey,
-                protocol: printer.printerProtocol
-            )
-            
-            // Also try to get job status (only for HTTP-based printers)
-            var job: PrintJobStatus?
-            if printer.printerProtocol != .act {
-                job = try? await api.getJobStatus(
-                    ipAddress: printer.ipAddress,
-                    apiKey: printer.apiKey
-                )
-            }
-            
-            await MainActor.run {
-                printerStatus = status
-                jobStatus = job
-                printer.isConnected = true
-                printer.lastConnected = Date()
-                isLoadingStatus = false
-            }
-        } catch {
-            await MainActor.run {
-                statusError = error
-                printer.isConnected = false
-                isLoadingStatus = false
-            }
-        }
-    }
-    
-    /// Auto-refresh status every 10 seconds while view is visible
-    private func startAutoRefresh() {
-        autoRefreshTask?.cancel()
-        autoRefreshTask = Task {
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(10))
-                if Task.isCancelled { break }
-                await refreshStatus()
-            }
-        }
-    }
-    
-    // MARK: - Print Controls
-    
-    private func pausePrint() {
-        Task {
-            do {
-                let api = AnycubicPrinterAPI()
-                try await api.pausePrint(
-                    ipAddress: printer.ipAddress,
-                    apiKey: printer.apiKey,
-                    protocol: printer.printerProtocol
-                )
-                await refreshStatus()
-            } catch {
-                await MainActor.run {
-                    controlError = "Failed to pause print: \(error.localizedDescription)"
-                    showingControlError = true
-                }
-            }
-        }
-    }
-    
-    private func resumePrint() {
-        Task {
-            do {
-                let api = AnycubicPrinterAPI()
-                try await api.resumePrint(
-                    ipAddress: printer.ipAddress,
-                    apiKey: printer.apiKey,
-                    protocol: printer.printerProtocol
-                )
-                await refreshStatus()
-            } catch {
-                await MainActor.run {
-                    controlError = "Failed to resume print: \(error.localizedDescription)"
-                    showingControlError = true
-                }
-            }
-        }
-    }
-    
-    private func cancelPrint() {
-        Task {
-            do {
-                let api = AnycubicPrinterAPI()
-                try await api.cancelPrint(
-                    ipAddress: printer.ipAddress,
-                    apiKey: printer.apiKey,
-                    protocol: printer.printerProtocol
-                )
-                await refreshStatus()
-            } catch {
-                await MainActor.run {
-                    controlError = "Failed to cancel print: \(error.localizedDescription)"
-                    showingControlError = true
-                }
-            }
-        }
-    }
-    
-    // MARK: - Helpers
-    
-    private func formatDuration(_ seconds: Double) -> String {
-        let hours = Int(seconds) / 3600
-        let minutes = (Int(seconds) % 3600) / 60
-        if hours > 0 {
-            return "\(hours)h \(minutes)m"
-        }
-        return "\(minutes)m"
     }
 }
