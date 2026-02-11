@@ -25,78 +25,27 @@ struct ContentView: View {
     @State private var showingStatistics = false
     @State private var showingCollections = false
     @State private var columnVisibility = NavigationSplitViewVisibility.all
+    @State private var selectedTab = 0
     @State private var errorMessage: String?
     @State private var showingError = false
 
     var body: some View {
-        NavigationSplitView(columnVisibility: $columnVisibility) {
-            ModelListView(
-                models: models,
-                selectedModel: $selectedModel,
-                showingScanner: $showingScanner,
-                showingImporter: $showingImporter,
-                showingPrintables: $showingPrintables,
-                showingPrintHistory: $showingPrintHistory,
-                showingPrinterSetup: $showingPrinterSetup,
-                showingSettings: $showingSettings,
-                showingPrintQueue: $showingPrintQueue,
-                showingStatistics: $showingStatistics,
-                showingCollections: $showingCollections,
-                onDelete: deleteModels
-            )
-        } detail: {
-            if let model = selectedModel {
-                ModelDetailView(model: model, printers: printers)
-            } else {
-                VStack(spacing: 20) {
-                    Image(systemName: "cube.transparent")
-                        .font(.system(size: 80))
-                        .foregroundStyle(.blue.gradient)
-                    
-                    Text("No Model Selected")
-                        .font(.title2)
-                        .fontWeight(.semibold)
-                    
-                    Text("Select a 3D model from the list or create a new one")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal)
-                    
-                    HStack(spacing: 16) {
-                        Button {
-                            showingScanner = true
-                        } label: {
-                            VStack(spacing: 8) {
-                                Image(systemName: "camera.fill")
-                                    .font(.title2)
-                                Text("Scan")
-                                    .font(.caption)
-                            }
-                            .frame(width: 100, height: 80)
-                            .background(.blue.opacity(0.1))
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                        }
-                        .buttonStyle(.plain)
-                        
-                        Button {
-                            showingImporter = true
-                        } label: {
-                            VStack(spacing: 8) {
-                                Image(systemName: "square.and.arrow.down.fill")
-                                    .font(.title2)
-                                Text("Import")
-                                    .font(.caption)
-                            }
-                            .frame(width: 100, height: 80)
-                            .background(.green.opacity(0.1))
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        TabView(selection: $selectedTab) {
+            // Dashboard tab
+            NavigationStack {
+                DashboardView()
             }
+            .tabItem {
+                Label("Dashboard", systemImage: "gauge.with.dots.needle.bottom.50percent")
+            }
+            .tag(0)
+
+            // Library tab
+            libraryContent
+                .tabItem {
+                    Label("Library", systemImage: "cube.transparent")
+                }
+                .tag(1)
         }
         .sheet(isPresented: $showingScanner) {
             ObjectScannerView { url in
@@ -155,6 +104,81 @@ struct ContentView: View {
             Button("OK", role: .cancel) { }
         } message: {
             Text(errorMessage ?? "An unknown error occurred.")
+        }
+    }
+
+    // MARK: - Library Tab Content
+
+    @ViewBuilder
+    private var libraryContent: some View {
+        NavigationSplitView(columnVisibility: $columnVisibility) {
+            ModelListView(
+                models: models,
+                selectedModel: $selectedModel,
+                showingScanner: $showingScanner,
+                showingImporter: $showingImporter,
+                showingPrintables: $showingPrintables,
+                showingPrintHistory: $showingPrintHistory,
+                showingPrinterSetup: $showingPrinterSetup,
+                showingSettings: $showingSettings,
+                showingPrintQueue: $showingPrintQueue,
+                showingStatistics: $showingStatistics,
+                showingCollections: $showingCollections,
+                onDelete: deleteModels
+            )
+        } detail: {
+            if let model = selectedModel {
+                ModelDetailView(model: model, printers: printers)
+            } else {
+                VStack(spacing: 20) {
+                    Image(systemName: "cube.transparent")
+                        .font(.system(size: 80))
+                        .foregroundStyle(.blue.gradient)
+
+                    Text("No Model Selected")
+                        .font(.title2)
+                        .fontWeight(.semibold)
+
+                    Text("Select a 3D model from the list or create a new one")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+
+                    HStack(spacing: 16) {
+                        Button {
+                            showingScanner = true
+                        } label: {
+                            VStack(spacing: 8) {
+                                Image(systemName: "camera.fill")
+                                    .font(.title2)
+                                Text("Scan")
+                                    .font(.caption)
+                            }
+                            .frame(width: 100, height: 80)
+                            .background(.blue.opacity(0.1))
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                        }
+                        .buttonStyle(.plain)
+
+                        Button {
+                            showingImporter = true
+                        } label: {
+                            VStack(spacing: 8) {
+                                Image(systemName: "square.and.arrow.down.fill")
+                                    .font(.title2)
+                                Text("Import")
+                                    .font(.caption)
+                            }
+                            .frame(width: 100, height: 80)
+                            .background(.green.opacity(0.1))
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
         }
     }
     
@@ -282,6 +306,16 @@ struct ContentView: View {
                     modelContext.insert(model)
                     selectedModel = model
                 }
+
+                // Analyze mesh dimensions for mesh formats
+                if fileType.needsSlicing {
+                    let analyzer = MeshAnalyzer()
+                    if let info = try? await analyzer.analyze(url: fileURL) {
+                        await MainActor.run {
+                            selectedModel?.applyMeshInfo(info)
+                        }
+                    }
+                }
             }
         } catch {
             await MainActor.run {
@@ -308,6 +342,7 @@ struct ModelListView: View {
     @Binding var showingCollections: Bool
     let onDelete: (IndexSet) -> Void
 
+    @Environment(\.modelContext) private var modelContext
     @AppStorage("defaultSortOption") private var sortOptionRaw = "Date (Newest)"
     @State private var searchText = ""
     @State private var filterOption: ModelFilterOption = .all
@@ -461,6 +496,7 @@ struct ModelListView: View {
                                 NavigationLink(value: model) {
                                     ModelRowView(model: model)
                                 }
+                                .draggable(model)
                                 .swipeActions(edge: .leading) {
                                     Button {
                                         model.isFavorite.toggle()
@@ -485,6 +521,10 @@ struct ModelListView: View {
                         }
                     }
                     .searchable(text: $searchText, prompt: "Search models")
+                    .dropDestination(for: URL.self) { urls, _ in
+                        handleDroppedURLs(urls)
+                        return true
+                    }
 
                     // Batch action bar
                     if isSelectMode && !selectedModelIDs.isEmpty {
@@ -716,6 +756,87 @@ struct ModelListView: View {
             }
             selectedModelIDs.removeAll()
             isSelectMode = false
+        }
+    }
+
+    /// Handle URLs dropped onto the model list (drag & drop import)
+    private func handleDroppedURLs(_ urls: [URL]) {
+        Task {
+            let converter = ModelConverter()
+            let context = modelContext
+
+            for url in urls {
+                let ext = url.pathExtension.lowercased()
+                let supported = ["stl", "obj", "usdz", "3mf", "gcode", "pwmx", "pwma", "ctb"]
+                guard supported.contains(ext) else { continue }
+
+                // Ensure we can access the file
+                let accessing = url.startAccessingSecurityScopedResource()
+                defer { if accessing { url.stopAccessingSecurityScopedResource() } }
+
+                guard FileManager.default.fileExists(atPath: url.path) else { continue }
+
+                let fileType = ModelFileType.from(path: url.path)
+
+                do {
+                    let importURL: URL
+                    if ext == "obj" {
+                        importURL = try await converter.convertOBJToSTL(objURL: url)
+                    } else if ext == "usdz" {
+                        importURL = try await converter.convertUSDZToSTL(usdzURL: url)
+                    } else {
+                        importURL = url
+                    }
+
+                    let (fileURL, fileSize) = try await STLFileManager.shared.importSTL(from: importURL)
+                    let relativePath = await STLFileManager.shared.relativePath(for: fileURL)
+
+                    var thumbnailData: Data?
+                    if fileType.needsSlicing && ["stl", "obj", "usdz"].contains(ext) {
+                        thumbnailData = try? await converter.generateThumbnail(from: fileURL)
+                    } else if fileType.isSliced {
+                        let parser = SlicedFileParser()
+                        thumbnailData = await parser.extractThumbnail(from: fileURL)
+                    }
+
+                    var slicedMetadata: SlicedFileMetadata?
+                    if fileType.isSliced {
+                        let parser = SlicedFileParser()
+                        slicedMetadata = await parser.parseMetadata(from: fileURL)
+                    }
+
+                    await MainActor.run {
+                        let model = PrintModel(
+                            name: url.deletingPathExtension().lastPathComponent,
+                            fileURL: relativePath,
+                            fileSize: fileSize,
+                            source: .imported,
+                            thumbnailData: thumbnailData
+                        )
+                        if let metadata = slicedMetadata {
+                            model.applyMetadata(metadata)
+                        }
+                        context.insert(model)
+                    }
+
+                    // Analyze dimensions for mesh formats
+                    if fileType.needsSlicing {
+                        let analyzer = MeshAnalyzer()
+                        if let info = try? await analyzer.analyze(url: fileURL) {
+                            await MainActor.run {
+                                let descriptor = FetchDescriptor<PrintModel>(
+                                    sortBy: [SortDescriptor(\.modifiedDate, order: .reverse)]
+                                )
+                                if let latest = try? context.fetch(descriptor).first {
+                                    latest.applyMeshInfo(info)
+                                }
+                            }
+                        }
+                    }
+                } catch {
+                    // Silently skip failed drops
+                }
+            }
         }
     }
 }

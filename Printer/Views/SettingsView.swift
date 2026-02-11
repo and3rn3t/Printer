@@ -29,6 +29,7 @@ struct SettingsView: View {
     @AppStorage("enablePrintNotifications") private var enablePrintNotifications = true
     @AppStorage("resinCostPerMl") private var resinCostPerMl: Double = 0.0
     @AppStorage("resinCurrency") private var resinCurrency: String = "USD"
+    @AppStorage("enableICloudSync") private var enableICloudSync = false
 
     // MARK: State
 
@@ -43,6 +44,12 @@ struct SettingsView: View {
     @State private var rescanCompleted: Int = 0
     @State private var rescanResultMessage: String?
     @State private var showingRescanResult = false
+    @State private var isAnalyzingDimensions = false
+    @State private var dimensionAnalysisProgress: Double = 0
+    @State private var dimensionAnalysisTotal: Int = 0
+    @State private var dimensionAnalysisCompleted: Int = 0
+    @State private var iCloudSyncStatus: String = "Checking…"
+    @State private var iCloudFileCount: Int = 0
 
     var body: some View {
         NavigationStack {
@@ -52,6 +59,7 @@ struct SettingsView: View {
                 printingSection
                 notificationsSection
                 costSection
+                iCloudSection
                 storageSection
                 dataSection
                 aboutSection
@@ -189,6 +197,41 @@ struct SettingsView: View {
         }
     }
 
+    private var iCloudSection: some View {
+        Section {
+            Toggle("iCloud Sync", isOn: $enableICloudSync)
+
+            if enableICloudSync {
+                HStack {
+                    Text("Status")
+                    Spacer()
+                    Text(iCloudSyncStatus)
+                        .foregroundStyle(.secondary)
+                }
+
+                HStack {
+                    Text("Synced Files")
+                    Spacer()
+                    Text("\(iCloudFileCount)")
+                        .foregroundStyle(.secondary)
+                }
+
+                Button("Refresh Sync Status") {
+                    Task { await refreshICloudStatus() }
+                }
+            }
+        } header: {
+            Label("iCloud", systemImage: "icloud")
+        } footer: {
+            Text("Sync your model library metadata across devices via iCloud. Large model files are synced to iCloud Documents.")
+        }
+        .task {
+            if enableICloudSync {
+                await refreshICloudStatus()
+            }
+        }
+    }
+
     private var storageSection: some View {
         Section {
             HStack {
@@ -235,6 +278,29 @@ struct SettingsView: View {
                     rescanLibrary()
                 } label: {
                     Label("Re-scan Slice Metadata", systemImage: "arrow.clockwise")
+                }
+                .disabled(models.isEmpty)
+            }
+
+            // Re-analyze dimensions for mesh models
+            if isAnalyzingDimensions {
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text("Analyzing Dimensions…")
+                        Spacer()
+                        Text("\(dimensionAnalysisCompleted)/\(dimensionAnalysisTotal)")
+                            .foregroundStyle(.secondary)
+                    }
+                    ProgressView(value: dimensionAnalysisProgress)
+                        .tint(.purple)
+                        .animation(.easeInOut(duration: 0.3), value: dimensionAnalysisProgress)
+                }
+                .transition(.opacity)
+            } else {
+                Button {
+                    reanalyzeDimensions()
+                } label: {
+                    Label("Re-analyze Mesh Dimensions", systemImage: "ruler")
                 }
                 .disabled(models.isEmpty)
             }
@@ -391,6 +457,63 @@ struct SettingsView: View {
                     rescanResultMessage = "Scanned \(modelsToScan.count) files: \(parts.joined(separator: ", "))."
                 }
                 showingRescanResult = true
+            }
+        }
+    }
+
+    /// Re-analyze all mesh models that are missing dimension data
+    private func reanalyzeDimensions() {
+        let meshModels = models.filter { $0.fileType.needsSlicing && !$0.hasDimensions }
+
+        guard !meshModels.isEmpty else {
+            rescanResultMessage = "All mesh models already have dimension data."
+            showingRescanResult = true
+            return
+        }
+
+        isAnalyzingDimensions = true
+        dimensionAnalysisTotal = meshModels.count
+        dimensionAnalysisCompleted = 0
+        dimensionAnalysisProgress = 0
+
+        Task {
+            let analyzer = MeshAnalyzer()
+            var analyzed = 0
+
+            for model in meshModels {
+                if let info = try? await analyzer.analyze(url: model.resolvedFileURL) {
+                    await MainActor.run {
+                        model.applyMeshInfo(info)
+                    }
+                    analyzed += 1
+                }
+
+                await MainActor.run {
+                    dimensionAnalysisCompleted += 1
+                    dimensionAnalysisProgress = Double(dimensionAnalysisCompleted) / Double(dimensionAnalysisTotal)
+                }
+            }
+
+            await MainActor.run {
+                isAnalyzingDimensions = false
+                rescanResultMessage = "Analyzed \(meshModels.count) mesh models: \(analyzed) dimensions extracted."
+                showingRescanResult = true
+            }
+        }
+    }
+
+    // MARK: - iCloud Sync
+
+    private func refreshICloudStatus() async {
+        let syncManager = CloudSyncManager.shared
+        let status = await syncManager.getSyncStatus()
+        await MainActor.run {
+            if status.isAvailable {
+                iCloudSyncStatus = "Available"
+                iCloudFileCount = status.fileCount
+            } else {
+                iCloudSyncStatus = "Unavailable"
+                iCloudFileCount = 0
             }
         }
     }

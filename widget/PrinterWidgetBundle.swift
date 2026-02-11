@@ -18,5 +18,7 @@ import WidgetKit
 struct PrinterWidgetBundle: WidgetBundle {
     var body: some Widget {
         PrinterLiveActivity()
+        PrinterStatusWidget()
+        PrinterAccessoryWidget()
     }
 }

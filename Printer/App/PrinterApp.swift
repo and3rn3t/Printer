@@ -7,6 +7,7 @@
 
 import SwiftUI
 import SwiftData
+import WidgetKit
 
 @main
 struct PrinterApp: App {
@@ -20,7 +21,19 @@ struct PrinterApp: App {
             Printer.self,
             ModelCollection.self,
         ])
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+
+        let iCloudEnabled = UserDefaults.standard.bool(forKey: "enableICloudSync")
+        let modelConfiguration: ModelConfiguration
+
+        if iCloudEnabled {
+            modelConfiguration = ModelConfiguration(
+                schema: schema,
+                isStoredInMemoryOnly: false,
+                cloudKitDatabase: .automatic
+            )
+        } else {
+            modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+        }
 
         do {
             return try ModelContainer(for: schema, configurations: [modelConfiguration])
@@ -34,6 +47,7 @@ struct PrinterApp: App {
             ContentView()
                 .task {
                     cleanupOldJobs()
+                    updateWidgetData()
                     // Request notification permission if enabled
                     if UserDefaults.standard.bool(forKey: "enablePrintNotifications") {
                         await PrintNotificationManager.shared.requestAuthorization()
@@ -41,6 +55,49 @@ struct PrinterApp: App {
                 }
         }
         .modelContainer(sharedModelContainer)
+    }
+
+    // MARK: - Widget Data Update
+
+    /// Write current printer/model/job data to shared UserDefaults for widget display
+    private func updateWidgetData() {
+        let context = sharedModelContainer.mainContext
+
+        do {
+            let printers = try context.fetch(FetchDescriptor<Printer>())
+            let modelCount = try context.fetchCount(FetchDescriptor<PrintModel>())
+            let allJobs = try context.fetch(FetchDescriptor<PrintJob>())
+
+            let completedCount = allJobs.filter { $0.status == .completed }.count
+            let finishedCount = allJobs.filter { $0.status == .completed || $0.status == .failed }.count
+            let successRate = finishedCount > 0 ? Int(Double(completedCount) / Double(finishedCount) * 100) : 0
+
+            let printerStates = printers.map { printer in
+                WidgetPrinterState(
+                    id: printer.id,
+                    name: printer.name,
+                    ipAddress: printer.ipAddress,
+                    printerProtocol: printer.printerProtocol.rawValue,
+                    isOnline: printer.isConnected,
+                    statusText: printer.isConnected ? "Online" : "Offline",
+                    isPrinting: false,
+                    fileName: nil,
+                    progress: nil,
+                    lastUpdated: Date()
+                )
+            }
+
+            let widgetData = WidgetData(
+                printers: printerStates,
+                modelCount: modelCount,
+                printJobCount: allJobs.count,
+                successRate: successRate
+            )
+            widgetData.save()
+            WidgetCenter.shared.reloadAllTimelines()
+        } catch {
+            // Non-fatal — widget data will be stale
+        }
     }
 
     // MARK: - Job Cleanup

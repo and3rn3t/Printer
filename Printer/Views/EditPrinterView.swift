@@ -22,6 +22,9 @@ struct EditPrinterView: View {
     @State private var model: String
     @State private var selectedProtocol: PrinterProtocol
     @State private var resinCostPerMl: String
+    @State private var buildPlateX: String
+    @State private var buildPlateY: String
+    @State private var buildPlateZ: String
     @State private var isTestingConnection = false
     @State private var connectionTestResult: Result<Bool, Error>?
 
@@ -34,6 +37,11 @@ struct EditPrinterView: View {
         _model = State(initialValue: printer.model)
         _selectedProtocol = State(initialValue: printer.printerProtocol)
         _resinCostPerMl = State(initialValue: printer.resinCostPerMl.map { String(format: "%.2f", $0) } ?? "")
+        // Init build plate fields from printer or known defaults
+        let known = Printer.knownBuildPlate(for: printer.model)
+        _buildPlateX = State(initialValue: (printer.buildPlateX ?? known?.0).map { String(format: "%.0f", $0) } ?? "")
+        _buildPlateY = State(initialValue: (printer.buildPlateY ?? known?.1).map { String(format: "%.0f", $0) } ?? "")
+        _buildPlateZ = State(initialValue: (printer.buildPlateZ ?? known?.2).map { String(format: "%.0f", $0) } ?? "")
     }
 
     var body: some View {
@@ -102,6 +110,49 @@ struct EditPrinterView: View {
                     Text("Cost")
                 } footer: {
                     Text("Per-printer cost overrides the global setting. Leave blank to use the global resin cost.")
+                }
+
+                Section {
+                    HStack {
+                        Text("Width")
+                        Spacer()
+                        TextField("198", text: $buildPlateX)
+                            .multilineTextAlignment(.trailing)
+                            .frame(width: 70)
+                            #if os(iOS)
+                            .keyboardType(.numberPad)
+                            #endif
+                        Text("mm")
+                            .foregroundStyle(.secondary)
+                    }
+                    HStack {
+                        Text("Depth")
+                        Spacer()
+                        TextField("122", text: $buildPlateY)
+                            .multilineTextAlignment(.trailing)
+                            .frame(width: 70)
+                            #if os(iOS)
+                            .keyboardType(.numberPad)
+                            #endif
+                        Text("mm")
+                            .foregroundStyle(.secondary)
+                    }
+                    HStack {
+                        Text("Height")
+                        Spacer()
+                        TextField("245", text: $buildPlateZ)
+                            .multilineTextAlignment(.trailing)
+                            .frame(width: 70)
+                            #if os(iOS)
+                            .keyboardType(.numberPad)
+                            #endif
+                        Text("mm")
+                            .foregroundStyle(.secondary)
+                    }
+                } header: {
+                    Text("Build Plate")
+                } footer: {
+                    Text("Set your printer's build volume for model fit checks.")
                 }
 
                 Section {
@@ -192,6 +243,9 @@ struct EditPrinterView: View {
         printer.model = model
         printer.printerProtocol = selectedProtocol
         printer.resinCostPerMl = Double(resinCostPerMl)
+        printer.buildPlateX = Float(buildPlateX)
+        printer.buildPlateY = Float(buildPlateY)
+        printer.buildPlateZ = Float(buildPlateZ)
         dismiss()
     }
 }

@@ -139,6 +139,36 @@ struct PrintJobView: View {
                         .foregroundStyle(.secondary)
                     }
                 }
+
+                // Model dimensions
+                if model.hasDimensions, let x = model.dimensionX, let y = model.dimensionY, let z = model.dimensionZ {
+                    Section("Model Dimensions") {
+                        LabeledContent("Size") {
+                            Text(String(format: "%.1f × %.1f × %.1f mm", x, y, z))
+                                .fontWeight(.medium)
+                        }
+
+                        // Build plate fit check
+                        if let printer = selectedPrinter {
+                            let bpX = printer.buildPlateX ?? 0
+                            let bpY = printer.buildPlateY ?? 0
+                            let bpZ = printer.buildPlateZ ?? 0
+                            if bpX > 0 && bpY > 0 && bpZ > 0 {
+                                let fits = x <= bpX && y <= bpY && z <= bpZ
+                                HStack {
+                                    Image(systemName: fits ? "checkmark.seal.fill" : "exclamationmark.triangle.fill")
+                                        .foregroundStyle(fits ? .green : .orange)
+                                    Text(fits ? "Fits on build plate" : "May exceed build plate")
+                                        .font(.subheadline)
+                                    Spacer()
+                                    Text(String(format: "%.0f × %.0f × %.0f mm", bpX, bpY, bpZ))
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                    }
+                }
                 
                 // ACT printer: file must already be on USB
                 if isACTPrinter {

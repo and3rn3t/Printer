@@ -222,6 +222,67 @@ struct ModelDetailView: View {
                         }
                     }
 
+                    // Mesh dimensions
+                    if model.hasDimensions {
+                        Divider()
+
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack {
+                                Image(systemName: "ruler")
+                                    .foregroundStyle(.blue)
+                                Text("Dimensions")
+                                    .font(.headline)
+                            }
+
+                            if let x = model.dimensionX, let y = model.dimensionY, let z = model.dimensionZ {
+                                HStack(spacing: 0) {
+                                    dimensionPill(label: "W", value: x, color: .red)
+                                    Text("×")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                        .padding(.horizontal, 4)
+                                    dimensionPill(label: "D", value: y, color: .green)
+                                    Text("×")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                        .padding(.horizontal, 4)
+                                    dimensionPill(label: "H", value: z, color: .blue)
+                                    Spacer()
+                                }
+                            }
+
+                            if let verts = model.vertexCount, verts > 0 {
+                                InfoRow(
+                                    icon: "circle.grid.cross",
+                                    label: "Vertices",
+                                    value: Self.formatCount(verts)
+                                )
+                            }
+
+                            if let tris = model.triangleCount, tris > 0 {
+                                InfoRow(
+                                    icon: "triangle",
+                                    label: "Triangles",
+                                    value: Self.formatCount(tris)
+                                )
+                            }
+                        }
+                    } else if model.fileType.needsSlicing {
+                        Divider()
+
+                        Button {
+                            Task {
+                                let analyzer = MeshAnalyzer()
+                                if let info = try? await analyzer.analyze(url: model.resolvedFileURL) {
+                                    model.applyMeshInfo(info)
+                                }
+                            }
+                        } label: {
+                            Label("Analyze Dimensions", systemImage: "ruler")
+                        }
+                        .buttonStyle(.bordered)
+                    }
+
                     // Sliced file metadata section
                     if model.hasSlicedMetadata {
                         Divider()
@@ -539,6 +600,44 @@ struct ModelDetailView: View {
             try? await STLFileManager.shared.deleteSTL(at: model.resolvedFileURL.path)
         }
         modelContext.delete(model)
+    }
+
+    /// Dimension pill view showing axis label + value
+    @ViewBuilder
+    private func dimensionPill(label: String, value: Float, color: Color) -> some View {
+        HStack(spacing: 4) {
+            Text(label)
+                .font(.caption2)
+                .fontWeight(.bold)
+                .foregroundStyle(color)
+            Text(Self.formatDimension(value))
+                .font(.callout)
+                .fontWeight(.medium)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
+        .background(color.opacity(0.1))
+        .clipShape(Capsule())
+    }
+
+    /// Format a dimension in mm, showing appropriate precision
+    static func formatDimension(_ value: Float) -> String {
+        if value >= 100 {
+            return String(format: "%.0f mm", value)
+        } else if value >= 10 {
+            return String(format: "%.1f mm", value)
+        }
+        return String(format: "%.2f mm", value)
+    }
+
+    /// Format large counts with K/M suffixes
+    static func formatCount(_ count: Int) -> String {
+        if count >= 1_000_000 {
+            return String(format: "%.1fM", Double(count) / 1_000_000)
+        } else if count >= 1_000 {
+            return String(format: "%.1fK", Double(count) / 1_000)
+        }
+        return "\(count)"
     }
     
 }

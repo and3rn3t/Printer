@@ -7,6 +7,8 @@
 
 import Foundation
 import SwiftData
+import CoreTransferable
+import UniformTypeIdentifiers
 
 // MARK: - File Type
 
@@ -140,6 +142,33 @@ final class PrintModel {
         fileType.needsSlicing
     }
 
+    // MARK: - Mesh Dimensions (populated by MeshAnalyzer)
+
+    /// Bounding box width in mm
+    var dimensionX: Float?
+    /// Bounding box depth in mm
+    var dimensionY: Float?
+    /// Bounding box height in mm
+    var dimensionZ: Float?
+    /// Total vertex count
+    var vertexCount: Int?
+    /// Total triangle count
+    var triangleCount: Int?
+
+    /// Whether mesh dimensions have been analyzed
+    var hasDimensions: Bool {
+        dimensionX != nil && dimensionY != nil && dimensionZ != nil
+    }
+
+    /// Populate dimension fields from mesh analysis
+    func applyMeshInfo(_ info: MeshAnalyzer.MeshInfo) {
+        dimensionX = info.dimensionX
+        dimensionY = info.dimensionY
+        dimensionZ = info.dimensionZ
+        vertexCount = info.vertexCount
+        triangleCount = info.triangleCount
+    }
+
     // MARK: - Sliced File Metadata (populated by SlicedFileParser)
 
     /// Total number of layers in the sliced file
@@ -204,6 +233,17 @@ final class PrintModel {
         self.collections = []
     }
 }
+
+// MARK: - Transferable
+
+extension PrintModel: Transferable {
+    static var transferRepresentation: some TransferRepresentation {
+        FileRepresentation(exportedContentType: .data) { model in
+            SentTransferredFile(model.resolvedFileURL)
+        }
+    }
+}
+
 enum ModelSource: Codable {
     case scanned
     case imported
@@ -340,6 +380,32 @@ final class Printer {
 
     /// Resin cost per milliliter for this printer (overrides global setting)
     var resinCostPerMl: Double?
+
+    /// Build plate width in mm
+    var buildPlateX: Float?
+    /// Build plate depth in mm
+    var buildPlateY: Float?
+    /// Build plate max height in mm
+    var buildPlateZ: Float?
+
+    /// Well-known build plate specs from printer model name.
+    /// Returns (width, depth, height) in mm, or nil if unknown.
+    static func knownBuildPlate(for model: String) -> (Float, Float, Float)? {
+        let m = model.lowercased()
+        if m.contains("mono x 6k") || m.contains("mono x 6ks") { return (198, 122, 245) }
+        if m.contains("mono x2") { return (196, 122, 200) }
+        if m.contains("mono x") { return (192, 120, 245) }
+        if m.contains("mono 4k") { return (134, 75, 165) }
+        if m.contains("mono 2") { return (143, 89, 165) }
+        if m.contains("mono") { return (130, 80, 165) }
+        if m.contains("photon ultra") { return (102, 57, 165) }
+        if m.contains("photon") { return (115, 65, 155) }
+        if m.contains("kobra 2 max") { return (420, 420, 500) }
+        if m.contains("kobra 2 plus") { return (320, 320, 400) }
+        if m.contains("kobra 2 pro") { return (220, 220, 250) }
+        if m.contains("kobra 2") { return (220, 220, 250) }
+        return nil
+    }
 
     init(
         name: String,
