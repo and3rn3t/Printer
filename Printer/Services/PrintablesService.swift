@@ -71,7 +71,7 @@ actor PrintablesService {
     ) async throws -> [PrintablesSearchResult] {
         let graphQL = """
         query SearchPrints($query: String!, $limit: Int, $offset: Int, $ordering: SearchChoicesEnum) {
-          searchPrints(query: $query, limit: $limit, offset: $offset, ordering: $ordering) {
+          searchPrints2(query: $query, limit: $limit, offset: $offset, ordering: $ordering) {
             items {
               id
               name
@@ -112,7 +112,7 @@ actor PrintablesService {
             throw PrintablesError.noData
         }
 
-        return data.searchPrints.items
+        return data.searchPrints2.items
     }
 
     /// Fetch full details for a single Printables model.

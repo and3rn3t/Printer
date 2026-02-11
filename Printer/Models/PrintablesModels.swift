@@ -47,9 +47,9 @@ struct GraphQLError: Decodable, Sendable {
 
 // MARK: - Search Response
 
-/// Response type for the `searchPrints` query
+/// Response type for the `searchPrints2` query
 struct SearchPrintsData: Decodable {
-    let searchPrints: SearchPrintsList
+    let searchPrints2: SearchPrintsList
 }
 
 struct SearchPrintsList: Decodable {
@@ -65,7 +65,7 @@ struct PrintDetailData: Decodable {
 
 // MARK: - Printables Data Types
 
-/// A search result from `searchPrints` — lightweight summary
+/// A search result from `searchPrints2` — lightweight summary
 struct PrintablesSearchResult: Decodable, Identifiable, Sendable {
     let id: String
     let name: String

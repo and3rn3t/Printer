@@ -990,7 +990,7 @@ struct PrintablesModelTests {
         let json = """
         {
             "data": {
-                "searchPrints": {
+                "searchPrints2": {
                     "items": []
                 }
             },
@@ -1000,7 +1000,7 @@ struct PrintablesModelTests {
 
         let response = try JSONDecoder().decode(GraphQLResponse<SearchPrintsData>.self, from: json)
         #expect(response.data != nil)
-        #expect(response.data?.searchPrints.items.isEmpty == true)
+        #expect(response.data?.searchPrints2.items.isEmpty == true)
         #expect(response.errors == nil)
     }
 
@@ -1039,7 +1039,7 @@ struct PrintablesModelTests {
         let json = """
         {
             "data": {
-                "searchPrints": {
+                "searchPrints2": {
                     "items": [
                         {
                             "id": "1",
@@ -1070,8 +1070,8 @@ struct PrintablesModelTests {
         """.data(using: .utf8)!
 
         let response = try JSONDecoder().decode(GraphQLResponse<SearchPrintsData>.self, from: json)
-        #expect(response.data?.searchPrints.items.count == 2)
-        #expect(response.data?.searchPrints.items[0].name == "Benchy")
-        #expect(response.data?.searchPrints.items[1].name == "Calibration Cube")
+        #expect(response.data?.searchPrints2.items.count == 2)
+        #expect(response.data?.searchPrints2.items[0].name == "Benchy")
+        #expect(response.data?.searchPrints2.items[1].name == "Calibration Cube")
     }
 }

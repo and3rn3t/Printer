@@ -31,6 +31,9 @@ struct ContentView: View {
                 selectedModel: $selectedModel,
                 showingScanner: $showingScanner,
                 showingImporter: $showingImporter,
+                showingPrintables: $showingPrintables,
+                showingPrintHistory: $showingPrintHistory,
+                showingPrinterSetup: $showingPrinterSetup,
                 onDelete: deleteModels
             )
         } detail: {
@@ -101,29 +104,6 @@ struct ContentView: View {
         ) { result in
             Task {
                 await handleImportedFiles(result: result)
-            }
-        }
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                HStack(spacing: 12) {
-                    Button {
-                        showingPrintables = true
-                    } label: {
-                        Label("Printables", systemImage: "globe")
-                    }
-
-                    Button {
-                        showingPrintHistory = true
-                    } label: {
-                        Label("History", systemImage: "clock.arrow.circlepath")
-                    }
-
-                    Button {
-                        showingPrinterSetup = true
-                    } label: {
-                        Label("Printers", systemImage: "printer")
-                    }
-                }
             }
         }
         .sheet(isPresented: $showingPrintables) {
@@ -271,6 +251,9 @@ struct ModelListView: View {
     @Binding var selectedModel: PrintModel?
     @Binding var showingScanner: Bool
     @Binding var showingImporter: Bool
+    @Binding var showingPrintables: Bool
+    @Binding var showingPrintHistory: Bool
+    @Binding var showingPrinterSetup: Bool
     let onDelete: (IndexSet) -> Void
     
     var body: some View {
@@ -349,7 +332,7 @@ struct ModelListView: View {
                 EditButton()
             }
 #endif
-            ToolbarItem {
+            ToolbarItem(placement: .primaryAction) {
                 Menu {
                     Button {
                         showingScanner = true
@@ -364,6 +347,30 @@ struct ModelListView: View {
                     }
                 } label: {
                     Label("Add Model", systemImage: "plus")
+                }
+            }
+
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    showingPrintables = true
+                } label: {
+                    Label("Printables", systemImage: "globe")
+                }
+            }
+
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    showingPrintHistory = true
+                } label: {
+                    Label("History", systemImage: "clock.arrow.circlepath")
+                }
+            }
+
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    showingPrinterSetup = true
+                } label: {
+                    Label("Printers", systemImage: "printer")
                 }
             }
         }
