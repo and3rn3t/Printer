@@ -9,7 +9,11 @@ import Foundation
 
 /// Handles communication with Anycubic 3D printers via their web interface
 ///
-/// Supports both OctoPrint-compatible REST API and native Anycubic HTTP protocol.
+/// Supports three protocols:
+/// - **ACT** (TCP port 6000): For Photon resin printers — delegates to `PhotonPrinterService`
+/// - **OctoPrint** (HTTP port 80): REST API for FDM printers with OctoPrint firmware
+/// - **Anycubic HTTP** (port 18910): Native Anycubic HTTP discovery/status endpoint
+///
 /// Includes retry logic with exponential backoff, real upload progress tracking,
 /// and connection health monitoring.
 actor AnycubicPrinterAPI {
@@ -26,6 +30,7 @@ actor AnycubicPrinterAPI {
         case timeout
         case cancelled
         case maxRetriesExceeded(lastError: Error)
+        case unsupportedOperation(String)
 
         var errorDescription: String? {
             switch self {
@@ -53,6 +58,8 @@ actor AnycubicPrinterAPI {
                 return "Request was cancelled"
             case .maxRetriesExceeded(let lastError):
                 return "Failed after multiple retries: \(lastError.localizedDescription)"
+            case .unsupportedOperation(let detail):
+                return detail
             }
         }
     }
@@ -105,6 +112,9 @@ actor AnycubicPrinterAPI {
 
     private let urlSession: URLSession
     private var uploadDelegates: [UUID: UploadProgressDelegate] = [:]
+    
+    /// ACT protocol service for Photon resin printers
+    private let photonService = PhotonPrinterService()
 
     // MARK: - Initialization
 
@@ -156,10 +166,18 @@ actor AnycubicPrinterAPI {
     // MARK: - Connection
 
     /// Test connection to printer with retry
+    ///
+    /// Tries ACT protocol (TCP port 6000) first, then falls back to HTTP.
     func testConnection(ipAddress: String, retryConfig: RetryConfiguration = .default) async throws
         -> Bool
     {
-        try await withRetry(config: retryConfig) { [urlSession] in
+        // Try ACT protocol first (Photon resin printers)
+        if try await photonService.testConnection(ipAddress: ipAddress) {
+            return true
+        }
+        
+        // Fall back to HTTP-based protocols
+        return try await withRetry(config: retryConfig) { [urlSession] in
             // Try Anycubic native endpoint first
             if let anycubicURL = URL(string: "http://\(ipAddress):18910/info") {
                 var request = URLRequest(url: anycubicURL)
@@ -198,8 +216,21 @@ actor AnycubicPrinterAPI {
     // MARK: - Printer Status
 
     /// Get printer status with retry
-    func getPrinterStatus(ipAddress: String, apiKey: String?) async throws -> PrinterStatus {
-        try await withRetry { [urlSession] in
+    ///
+    /// For Photon printers (ACT protocol), delegates to `PhotonPrinterService`.
+    /// For HTTP printers, tries Anycubic native then OctoPrint.
+    func getPrinterStatus(
+        ipAddress: String,
+        apiKey: String?,
+        protocol printerProtocol: PrinterProtocol = .act
+    ) async throws -> PrinterStatus {
+        // ACT protocol path — Photon resin printers
+        if printerProtocol == .act {
+            return try await photonService.getPrinterStatus(ipAddress: ipAddress)
+        }
+        
+        // HTTP protocol paths
+        return try await withRetry { [urlSession] in
             // Try Anycubic native endpoint first
             if let nativeStatus = try? await Self.getAnycubicNativeStatus(
                 ipAddress: ipAddress,
@@ -387,8 +418,14 @@ actor AnycubicPrinterAPI {
     func startPrint(
         ipAddress: String,
         apiKey: String?,
-        filename: String
+        filename: String,
+        protocol printerProtocol: PrinterProtocol = .act
     ) async throws {
+        if printerProtocol == .act {
+            try await photonService.startPrint(ipAddress: ipAddress, filename: filename)
+            return
+        }
+        
         try await withRetry { [urlSession] in
             guard let url = URL(string: "http://\(ipAddress)/api/files/local/\(filename)") else {
                 throw APIError.invalidURL
@@ -417,19 +454,43 @@ actor AnycubicPrinterAPI {
     }
 
     /// Pause current print job
-    func pausePrint(ipAddress: String, apiKey: String?) async throws {
+    func pausePrint(
+        ipAddress: String,
+        apiKey: String?,
+        protocol printerProtocol: PrinterProtocol = .act
+    ) async throws {
+        if printerProtocol == .act {
+            try await photonService.pausePrint(ipAddress: ipAddress)
+            return
+        }
         try await sendJobCommand(
             ipAddress: ipAddress, apiKey: apiKey, command: "pause", action: "pause")
     }
 
     /// Resume paused print job
-    func resumePrint(ipAddress: String, apiKey: String?) async throws {
+    func resumePrint(
+        ipAddress: String,
+        apiKey: String?,
+        protocol printerProtocol: PrinterProtocol = .act
+    ) async throws {
+        if printerProtocol == .act {
+            try await photonService.resumePrint(ipAddress: ipAddress)
+            return
+        }
         try await sendJobCommand(
             ipAddress: ipAddress, apiKey: apiKey, command: "pause", action: "resume")
     }
 
     /// Cancel current print job
-    func cancelPrint(ipAddress: String, apiKey: String?) async throws {
+    func cancelPrint(
+        ipAddress: String,
+        apiKey: String?,
+        protocol printerProtocol: PrinterProtocol = .act
+    ) async throws {
+        if printerProtocol == .act {
+            try await photonService.stopPrint(ipAddress: ipAddress)
+            return
+        }
         try await sendJobCommand(ipAddress: ipAddress, apiKey: apiKey, command: "cancel")
     }
 
@@ -552,6 +613,11 @@ actor AnycubicPrinterAPI {
 
     /// Check if printer is reachable (lightweight ping)
     func isReachable(ipAddress: String) async -> Bool {
+        // Try ACT protocol first (fastest for Photon printers)
+        if await PhotonPrinterService.probe(ipAddress: ipAddress) {
+            return true
+        }
+        
         guard let url = URL(string: "http://\(ipAddress)/api/version") else {
             return false
         }

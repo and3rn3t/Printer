@@ -288,18 +288,39 @@ struct AddPrinterView: View {
     }
     
     private func addPrinter() {
+        // Determine protocol based on discovery method
+        let printerProtocol: PrinterProtocol
+        let port: Int
+        if let discovered = selectedDiscoveredPrinter {
+            switch discovered.discoveryMethod {
+            case .anycubicACT:
+                printerProtocol = .act
+                port = PhotonPrinterService.defaultPort
+            case .anycubicHTTP:
+                printerProtocol = .anycubicHTTP
+                port = 18910
+            default:
+                printerProtocol = .octoprint
+                port = 80
+            }
+        } else {
+            printerProtocol = .act  // Default to ACT for Anycubic printers
+            port = PhotonPrinterService.defaultPort
+        }
+        
         let printer = Printer(
             name: name,
             ipAddress: ipAddress,
             apiKey: apiKey.isEmpty ? nil : apiKey,
             manufacturer: "Anycubic",
-            model: model
+            model: model,
+            port: port,
+            printerProtocol: printerProtocol
         )
         
         // Populate discovery data if available
         if let discovered = selectedDiscoveredPrinter {
             printer.serialNumber = discovered.serialNumber
-            printer.port = discovered.port
         }
         
         modelContext.insert(printer)
@@ -440,6 +461,7 @@ struct PrinterDiscoveryView: View {
         switch method {
         case .bonjour: return "bonjour"
         case .anycubicHTTP: return "antenna.radiowaves.left.and.right"
+        case .anycubicACT: return "network"
         case .manual: return "hand.tap"
         }
     }
@@ -612,14 +634,18 @@ struct PrinterDetailView: View {
             let api = AnycubicPrinterAPI()
             let status = try await api.getPrinterStatus(
                 ipAddress: printer.ipAddress,
-                apiKey: printer.apiKey
+                apiKey: printer.apiKey,
+                protocol: printer.printerProtocol
             )
             
-            // Also try to get job status
-            let job = try? await api.getJobStatus(
-                ipAddress: printer.ipAddress,
-                apiKey: printer.apiKey
-            )
+            // Also try to get job status (only for HTTP-based printers)
+            var job: PrintJobStatus?
+            if printer.printerProtocol != .act {
+                job = try? await api.getJobStatus(
+                    ipAddress: printer.ipAddress,
+                    apiKey: printer.apiKey
+                )
+            }
             
             await MainActor.run {
                 printerStatus = status
@@ -655,7 +681,11 @@ struct PrinterDetailView: View {
         Task {
             do {
                 let api = AnycubicPrinterAPI()
-                try await api.pausePrint(ipAddress: printer.ipAddress, apiKey: printer.apiKey)
+                try await api.pausePrint(
+                    ipAddress: printer.ipAddress,
+                    apiKey: printer.apiKey,
+                    protocol: printer.printerProtocol
+                )
                 await refreshStatus()
             } catch {
                 await MainActor.run {
@@ -670,7 +700,11 @@ struct PrinterDetailView: View {
         Task {
             do {
                 let api = AnycubicPrinterAPI()
-                try await api.resumePrint(ipAddress: printer.ipAddress, apiKey: printer.apiKey)
+                try await api.resumePrint(
+                    ipAddress: printer.ipAddress,
+                    apiKey: printer.apiKey,
+                    protocol: printer.printerProtocol
+                )
                 await refreshStatus()
             } catch {
                 await MainActor.run {
@@ -685,7 +719,11 @@ struct PrinterDetailView: View {
         Task {
             do {
                 let api = AnycubicPrinterAPI()
-                try await api.cancelPrint(ipAddress: printer.ipAddress, apiKey: printer.apiKey)
+                try await api.cancelPrint(
+                    ipAddress: printer.ipAddress,
+                    apiKey: printer.apiKey,
+                    protocol: printer.printerProtocol
+                )
                 await refreshStatus()
             } catch {
                 await MainActor.run {

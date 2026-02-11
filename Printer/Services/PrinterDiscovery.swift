@@ -26,6 +26,7 @@ struct DiscoveredPrinter: Identifiable, Hashable {
     enum DiscoveryMethod: String {
         case bonjour = "Bonjour"
         case anycubicHTTP = "Anycubic HTTP"
+        case anycubicACT = "Anycubic ACT"
         case manual = "Manual"
     }
     
@@ -186,6 +187,37 @@ final class PrinterDiscovery {
         }
     }
     
+    // MARK: - Anycubic ACT Discovery (Photon Resin Printers)
+    
+    /// Probe a specific IP address for an Anycubic Photon printer using ACT protocol
+    ///
+    /// Connects to TCP port 6000 and runs `sysinfo` to identify the printer.
+    func probeACTPrinter(ipAddress: String) async -> DiscoveredPrinter? {
+        // Quick TCP probe first
+        guard await PhotonPrinterService.probe(ipAddress: ipAddress) else {
+            return nil
+        }
+        
+        // Get system info via ACT protocol
+        let photon = PhotonPrinterService()
+        do {
+            let sysInfo = try await photon.getSystemInfo(ipAddress: ipAddress)
+            return DiscoveredPrinter(
+                id: sysInfo.serialNumber,
+                name: sysInfo.modelName,
+                ipAddress: ipAddress,
+                port: PhotonPrinterService.defaultPort,
+                manufacturer: "Anycubic",
+                model: sysInfo.modelName,
+                serialNumber: sysInfo.serialNumber,
+                discoveryMethod: .anycubicACT,
+                discoveredAt: Date()
+            )
+        } catch {
+            return nil
+        }
+    }
+    
     // MARK: - Anycubic HTTP Discovery
     
     /// Probe a specific IP address for an Anycubic printer
@@ -265,7 +297,12 @@ final class PrinterDiscovery {
                     for i in batchStart...batchEnd {
                         let ip = "\(subnet).\(i)"
                         group.addTask {
-                            await self.probeAnycubicPrinter(ipAddress: ip)
+                            // Try ACT protocol first (Photon resin printers on port 6000)
+                            if let actPrinter = await self.probeACTPrinter(ipAddress: ip) {
+                                return actPrinter
+                            }
+                            // Fall back to Anycubic HTTP discovery
+                            return await self.probeAnycubicPrinter(ipAddress: ip)
                         }
                     }
                     

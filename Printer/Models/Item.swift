@@ -102,6 +102,17 @@ enum PrintStatus: Codable {
     case cancelled
 }
 
+/// Communication protocol used by a printer
+///
+/// - `act`: Anycubic TCP protocol (Photon resin printers, port 6000)
+/// - `octoprint`: OctoPrint-compatible REST API (FDM printers, port 80)
+/// - `anycubicHTTP`: Anycubic native HTTP API (port 18910)
+enum PrinterProtocol: String, Codable {
+    case act
+    case octoprint
+    case anycubicHTTP
+}
+
 /// Represents a connected 3D printer
 @Model
 final class Printer {
@@ -117,8 +128,11 @@ final class Printer {
     /// Serial number / CN from Anycubic discovery
     var serialNumber: String?
     
-    /// Port used for connection (default 80 for OctoPrint, 18910 for Anycubic native)
+    /// Port used for connection (default 6000 for ACT, 80 for OctoPrint, 18910 for Anycubic HTTP)
     var port: Int
+    
+    /// Communication protocol — ACT for Photon resin printers, OctoPrint for FDM
+    var printerProtocol: PrinterProtocol
     
     /// Device ID for MQTT communication
     var deviceId: String?
@@ -135,7 +149,8 @@ final class Printer {
         apiKey: String? = nil,
         manufacturer: String = "Anycubic",
         model: String = "",
-        port: Int = 80
+        port: Int = 6000,
+        printerProtocol: PrinterProtocol = .act
     ) {
         self.id = UUID()
         self.name = name
@@ -144,6 +159,7 @@ final class Printer {
         self.manufacturer = manufacturer
         self.model = model
         self.port = port
+        self.printerProtocol = printerProtocol
         self.isConnected = false
     }
 }

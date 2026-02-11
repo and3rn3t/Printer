@@ -213,7 +213,8 @@ struct PrintJobView: View {
                     try await api.startPrint(
                         ipAddress: printer.ipAddress,
                         apiKey: printer.apiKey,
-                        filename: "\(model.name).stl"
+                        filename: "\(model.name).stl",
+                        protocol: printer.printerProtocol
                     )
                 } else {
                     job.status = .queued
