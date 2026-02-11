@@ -136,7 +136,46 @@ final class PrintModel {
     var requiresSlicing: Bool {
         fileType.needsSlicing
     }
-    
+
+    // MARK: - Sliced File Metadata (populated by SlicedFileParser)
+
+    /// Total number of layers in the sliced file
+    var slicedLayerCount: Int?
+    /// Layer height in millimeters
+    var slicedLayerHeight: Float?
+    /// Estimated print time in seconds
+    var slicedPrintTimeSeconds: Int?
+    /// Resin/material volume in milliliters
+    var slicedVolumeMl: Float?
+    /// Printer X resolution in pixels
+    var slicedResolutionX: Int?
+    /// Printer Y resolution in pixels
+    var slicedResolutionY: Int?
+    /// Normal layer exposure time in seconds
+    var slicedExposureTime: Float?
+    /// Bottom layer exposure time in seconds
+    var slicedBottomExposureTime: Float?
+    /// Total print height in millimeters
+    var slicedPrintHeight: Float?
+
+    /// Whether this model has parsed sliced metadata
+    var hasSlicedMetadata: Bool {
+        slicedLayerCount != nil
+    }
+
+    /// Populate sliced metadata fields from parsed metadata
+    func applyMetadata(_ metadata: SlicedFileMetadata) {
+        slicedLayerCount = metadata.layerCount > 0 ? Int(metadata.layerCount) : nil
+        slicedLayerHeight = metadata.layerHeight > 0 ? metadata.layerHeight : nil
+        slicedPrintTimeSeconds = metadata.printTime > 0 ? Int(metadata.printTime) : nil
+        slicedVolumeMl = metadata.volumeMl > 0 ? metadata.volumeMl : nil
+        slicedResolutionX = metadata.resolutionX > 0 ? Int(metadata.resolutionX) : nil
+        slicedResolutionY = metadata.resolutionY > 0 ? Int(metadata.resolutionY) : nil
+        slicedExposureTime = metadata.exposureTime > 0 ? metadata.exposureTime : nil
+        slicedBottomExposureTime = metadata.bottomExposureTime > 0 ? metadata.bottomExposureTime : nil
+        slicedPrintHeight = metadata.printHeight
+    }
+
     init(
         name: String,
         fileURL: String,

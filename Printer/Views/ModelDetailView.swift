@@ -179,6 +179,100 @@ struct ModelDetailView: View {
                         }
                     }
 
+                    // Sliced file metadata section
+                    if model.hasSlicedMetadata {
+                        Divider()
+
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack {
+                                Image(systemName: "layers.3d.top.filled")
+                                    .foregroundStyle(.blue)
+                                Text("Slice Details")
+                                    .font(.headline)
+                            }
+
+                            if let layers = model.slicedLayerCount {
+                                InfoRow(
+                                    icon: "square.stack.3d.up",
+                                    label: "Layers",
+                                    value: "\(layers)"
+                                )
+                            }
+
+                            if let layerHeight = model.slicedLayerHeight {
+                                InfoRow(
+                                    icon: "ruler",
+                                    label: "Layer Height",
+                                    value: String(format: "%.3f mm", layerHeight)
+                                )
+                            }
+
+                            if let height = model.slicedPrintHeight, height > 0 {
+                                InfoRow(
+                                    icon: "arrow.up.and.down",
+                                    label: "Print Height",
+                                    value: String(format: "%.2f mm", height)
+                                )
+                            }
+
+                            if let time = model.slicedPrintTimeSeconds, time > 0 {
+                                InfoRow(
+                                    icon: "clock",
+                                    label: "Est. Print Time",
+                                    value: formatDuration(Double(time))
+                                )
+                            }
+
+                            if let volume = model.slicedVolumeMl, volume > 0 {
+                                InfoRow(
+                                    icon: "drop.fill",
+                                    label: "Resin Volume",
+                                    value: String(format: "%.1f mL", volume)
+                                )
+                            }
+
+                            if let exposure = model.slicedExposureTime {
+                                InfoRow(
+                                    icon: "sun.max.fill",
+                                    label: "Exposure",
+                                    value: String(format: "%.1f s", exposure)
+                                )
+                            }
+
+                            if let bottomExposure = model.slicedBottomExposureTime {
+                                InfoRow(
+                                    icon: "sun.max.trianglebadge.exclamationmark",
+                                    label: "Bottom Exposure",
+                                    value: String(format: "%.1f s", bottomExposure)
+                                )
+                            }
+
+                            if let resX = model.slicedResolutionX, let resY = model.slicedResolutionY,
+                               resX > 0, resY > 0 {
+                                InfoRow(
+                                    icon: "rectangle.split.3x3",
+                                    label: "Resolution",
+                                    value: "\(resX) × \(resY)"
+                                )
+                            }
+                        }
+                    } else if model.fileType.isSliced {
+                        // Sliced file but no metadata — offer re-parse
+                        Divider()
+
+                        Button {
+                            Task {
+                                let parser = SlicedFileParser()
+                                if let metadata = await parser.parseMetadata(from: model.resolvedFileURL) {
+                                    model.applyMetadata(metadata)
+                                }
+                            }
+                        } label: {
+                            Label("Parse Slice Metadata", systemImage: "arrow.clockwise.circle")
+                        }
+                        .buttonStyle(.bordered)
+                    }
+
                     Divider()
 
                     // Favorite toggle

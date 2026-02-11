@@ -334,6 +334,14 @@ struct PrintablesDetailView: View {
                     thumbnailData = try? await converter.generateThumbnail(from: savedURL)
                 }
 
+                // Extract sliced file metadata if applicable
+                let fileModelType = ModelFileType.from(path: savedURL.path)
+                var slicedMetadata: SlicedFileMetadata?
+                if fileModelType.isSliced {
+                    let parser = SlicedFileParser()
+                    slicedMetadata = await parser.parseMetadata(from: savedURL)
+                }
+
                 await MainActor.run {
                     let printModel = PrintModel(
                         name: modelName,
@@ -342,6 +350,11 @@ struct PrintablesDetailView: View {
                         source: .downloaded,
                         thumbnailData: thumbnailData
                     )
+
+                    if let metadata = slicedMetadata {
+                        printModel.applyMetadata(metadata)
+                    }
+
                     modelContext.insert(printModel)
 
                     downloadingFileID = nil

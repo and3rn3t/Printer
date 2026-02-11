@@ -90,6 +90,13 @@ struct PrintablesSearchResult: Decodable, Identifiable, Sendable {
     let likesCount: Int
     let downloadCount: Int
     let datePublished: String
+    let gcodes: [PrintablesFileRef]?
+    let slas: [PrintablesFileRef]?
+
+    /// Whether this model includes pre-sliced files (GCode or SLA/resin)
+    var hasSlicedFiles: Bool {
+        !(gcodes ?? []).isEmpty || !(slas ?? []).isEmpty
+    }
 
     /// Human-readable date (e.g. "Feb 14, 2025")
     var formattedDate: String {
@@ -197,6 +204,11 @@ struct PrintablesLicense: Decodable, Sendable {
     let id: String
     let name: String?
     let disallowRemixing: Bool?
+}
+
+/// Lightweight file reference used in search results (ID only)
+struct PrintablesFileRef: Decodable, Identifiable, Sendable {
+    let id: String
 }
 
 // MARK: - Search Ordering

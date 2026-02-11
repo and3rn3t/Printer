@@ -85,6 +85,8 @@ actor PrintablesService {
               likesCount
               downloadCount
               datePublished
+              gcodes { id }
+              slas { id }
             }
           }
         }

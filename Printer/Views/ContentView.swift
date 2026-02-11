@@ -239,6 +239,13 @@ struct ContentView: View {
                 // Store as relative path for container resilience
                 let relativePath = await STLFileManager.shared.relativePath(for: fileURL)
                 
+                // Extract sliced file metadata if applicable
+                var slicedMetadata: SlicedFileMetadata?
+                if fileType.isSliced {
+                    let parser = SlicedFileParser()
+                    slicedMetadata = await parser.parseMetadata(from: fileURL)
+                }
+                
                 // Create model entry
                 await MainActor.run {
                     let model = PrintModel(
@@ -248,6 +255,11 @@ struct ContentView: View {
                         source: .imported,
                         thumbnailData: thumbnailData
                     )
+                    
+                    // Apply sliced file metadata if parsed
+                    if let metadata = slicedMetadata {
+                        model.applyMetadata(metadata)
+                    }
                     
                     modelContext.insert(model)
                     selectedModel = model
@@ -621,6 +633,18 @@ struct ModelRowView: View {
                         .background(model.requiresSlicing ? Color.orange.opacity(0.15) : Color.green.opacity(0.15))
                         .foregroundStyle(model.requiresSlicing ? .orange : .green)
                         .clipShape(Capsule())
+
+                    // Pre-sliced indicator for downloaded sliced files
+                    if model.fileType.isSliced && model.hasSlicedMetadata {
+                        Label("Sliced", systemImage: "checkmark.seal.fill")
+                            .font(.caption2)
+                            .fontWeight(.medium)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 1)
+                            .background(Color.blue.opacity(0.15))
+                            .foregroundStyle(.blue)
+                            .clipShape(Capsule())
+                    }
                 }
                 
                 if !model.printJobs.isEmpty {

@@ -292,6 +292,17 @@ struct PrintablesResultRow: View {
                 Text(result.formattedDate)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
+
+                if result.hasSlicedFiles {
+                    Label("Slice Ready", systemImage: "checkmark.seal.fill")
+                        .font(.caption2)
+                        .fontWeight(.medium)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.blue.opacity(0.15))
+                        .foregroundStyle(.blue)
+                        .clipShape(Capsule())
+                }
             }
 
             Spacer()
