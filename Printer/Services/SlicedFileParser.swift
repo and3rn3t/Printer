@@ -6,6 +6,12 @@
 //
 
 import Foundation
+#if canImport(UIKit)
+import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
+import CoreGraphics
 
 // MARK: - Sliced File Metadata
 
@@ -452,6 +458,256 @@ actor SlicedFileParser {
             }
         }
         return nil
+    }
+
+    // MARK: - Thumbnail Extraction
+
+    /// Extract an embedded preview thumbnail from a sliced file
+    /// - Parameter url: URL to the sliced file
+    /// - Returns: PNG image data, or nil if no thumbnail is available
+    func extractThumbnail(from url: URL) async -> Data? {
+        let ext = url.pathExtension.lowercased()
+        do {
+            switch ext {
+            case "pwmx", "pwma", "pwmb", "pwmo", "pwms", "pws", "pw0",
+                 "dlp", "dl2p", "pmx2", "px6s", "pm3n", "pm4n",
+                 "pmsq", "pm3", "pm3m", "pm3r", "pm5", "pm5s", "m5sp", "pwc":
+                return try extractPWMXThumbnail(from: url)
+            case "ctb", "cbddlp", "photon", "phz":
+                return try extractCTBThumbnail(from: url)
+            default:
+                return nil
+            }
+        } catch {
+            print("SlicedFileParser: Failed to extract thumbnail from \(ext): \(error.localizedDescription)")
+            return nil
+        }
+    }
+
+    /// Extract thumbnail from a PWMX/Anycubic Photon Workshop file
+    ///
+    /// Preview section layout at PreviewAddress (FileMark offset 24):
+    /// - "PREVIEW" mark (12 bytes) + TableLength (uint32)
+    /// - ResolutionX (uint32, default 224)
+    /// - "x" mark (4 bytes)
+    /// - ResolutionY (uint32, default 168)
+    /// - Raw RGB565 pixel data (ResX × ResY × 2 bytes)
+    private func extractPWMXThumbnail(from url: URL) throws -> Data? {
+        guard let fileHandle = FileHandle(forReadingAtPath: url.path) else {
+            throw SlicedFileParserError.readError
+        }
+        defer { fileHandle.closeFile() }
+
+        // Read FileMark to get PreviewAddress
+        let fileMarkData = fileHandle.readData(ofLength: 80)
+        guard fileMarkData.count >= 28 else {
+            throw SlicedFileParserError.fileTooSmall
+        }
+
+        // Validate magic
+        let markString = String(data: fileMarkData.prefix(8), encoding: .utf8)?
+            .trimmingCharacters(in: .controlCharacters) ?? ""
+        guard markString == PWMXConstants.fileMarkString else {
+            throw SlicedFileParserError.invalidMagic(PWMXConstants.fileMarkString)
+        }
+
+        // PreviewAddress is at FileMark offset 24
+        let previewAddress = fileMarkData.readUInt32(at: 24)
+        guard previewAddress > 0 else { return nil }
+
+        // Seek to preview section
+        fileHandle.seek(toFileOffset: UInt64(previewAddress))
+
+        // Read preview header: mark (12) + tableLength (4) + resX (4) + "x" (4) + resY (4) = 28 bytes
+        let previewHeader = fileHandle.readData(ofLength: 28)
+        guard previewHeader.count >= 28 else { return nil }
+
+        // Validate "PREVIEW" mark (first 7 bytes)
+        let previewMark = String(data: previewHeader.prefix(7), encoding: .utf8) ?? ""
+        guard previewMark == "PREVIEW" else { return nil }
+
+        let resolutionX = previewHeader.readUInt32(at: PWMXConstants.tableBaseLength)      // offset 16
+        let resolutionY = previewHeader.readUInt32(at: PWMXConstants.tableBaseLength + 8)   // offset 24 (after 4-byte "x" mark)
+
+        guard resolutionX > 0, resolutionY > 0,
+              resolutionX <= 1024, resolutionY <= 1024 else { return nil }
+
+        // Read raw RGB565 pixel data
+        let dataSize = Int(resolutionX * resolutionY) * 2
+        let pixelData = fileHandle.readData(ofLength: dataSize)
+        guard pixelData.count == dataSize else { return nil }
+
+        return decodeRGB565(pixelData, width: Int(resolutionX), height: Int(resolutionY))
+    }
+
+    /// Extract thumbnail from a CTB/ChiTuBox format file
+    ///
+    /// Header offset 60: PreviewLargeOffsetAddress → Preview struct:
+    /// - ResolutionX (uint32) + ResolutionY (uint32)
+    /// - ImageOffset (uint32) + ImageLength (uint32)
+    /// - 4 unknown uint32s
+    /// Image data at ImageOffset is RLE-compressed RGB15
+    private func extractCTBThumbnail(from url: URL) throws -> Data? {
+        guard let fileHandle = FileHandle(forReadingAtPath: url.path) else {
+            throw SlicedFileParserError.readError
+        }
+        defer { fileHandle.closeFile() }
+
+        // Read header to get preview offset
+        let headerData = fileHandle.readData(ofLength: CTBConstants.headerSize)
+        guard headerData.count >= CTBConstants.headerSize else {
+            throw SlicedFileParserError.fileTooSmall
+        }
+
+        // Validate magic
+        let magic = headerData.readUInt32(at: 0)
+        guard magic == CTBConstants.magicCBDDLP ||
+              magic == CTBConstants.magicCTB ||
+              magic == CTBConstants.magicCTBv4 ||
+              magic == CTBConstants.magicCTBv4GK ||
+              magic == CTBConstants.magicPHZ else {
+            throw SlicedFileParserError.invalidMagic("CTB/CBDDLP/PHZ")
+        }
+
+        // PreviewLargeOffsetAddress at header offset 60 (large preview)
+        // PreviewSmallOffsetAddress at header offset 72 (small preview)
+        let previewOffset = headerData.readUInt32(at: 60)
+        guard previewOffset > 0 else { return nil }
+
+        // Seek to preview struct
+        fileHandle.seek(toFileOffset: UInt64(previewOffset))
+
+        // Preview struct: ResX (4) + ResY (4) + ImageOffset (4) + ImageLength (4) + 4 unknowns (16) = 32 bytes
+        let previewStruct = fileHandle.readData(ofLength: 32)
+        guard previewStruct.count >= 16 else { return nil }
+
+        let resolutionX = previewStruct.readUInt32(at: 0)
+        let resolutionY = previewStruct.readUInt32(at: 4)
+        let imageOffset = previewStruct.readUInt32(at: 8)
+        let imageLength = previewStruct.readUInt32(at: 12)
+
+        guard resolutionX > 0, resolutionY > 0,
+              resolutionX <= 1024, resolutionY <= 1024,
+              imageOffset > 0, imageLength > 0 else { return nil }
+
+        // Seek to image data
+        fileHandle.seek(toFileOffset: UInt64(imageOffset))
+        let rleData = fileHandle.readData(ofLength: Int(imageLength))
+        guard rleData.count == Int(imageLength) else { return nil }
+
+        return decodeChiTuRLE15(rleData, width: Int(resolutionX), height: Int(resolutionY))
+    }
+
+    // MARK: - Image Decoding
+
+    /// Decode raw RGB565 pixel data to PNG
+    ///
+    /// RGB565 format: each pixel is 2 bytes (little-endian)
+    /// - Bits [15:11] = Red (5 bits)
+    /// - Bits [10:5] = Green (6 bits)
+    /// - Bits [4:0] = Blue (5 bits)
+    private func decodeRGB565(_ data: Data, width: Int, height: Int) -> Data? {
+        let pixelCount = width * height
+        var rgba = [UInt8](repeating: 255, count: pixelCount * 4)
+
+        data.withUnsafeBytes { buffer in
+            for i in 0..<pixelCount {
+                let offset = i * 2
+                guard offset + 1 < buffer.count else { break }
+                let pixel = UInt16(buffer[offset]) | (UInt16(buffer[offset + 1]) << 8)
+
+                let r = (pixel >> 11) & 0x1F
+                let g = (pixel >> 5) & 0x3F
+                let b = pixel & 0x1F
+
+                rgba[i * 4 + 0] = UInt8(r * 255 / 31)
+                rgba[i * 4 + 1] = UInt8(g * 255 / 63)
+                rgba[i * 4 + 2] = UInt8(b * 255 / 31)
+                rgba[i * 4 + 3] = 255
+            }
+        }
+
+        return createPNGFromRGBA(rgba, width: width, height: height)
+    }
+
+    /// Decode ChiTu RLE15 compressed image data to PNG
+    ///
+    /// Each uint16 in the stream: `RRRRRGGGGGBBBBBX`
+    /// - If X (bit 0) is 0: single pixel, color = pixel >> 1
+    /// - If X (bit 0) is 1: next uint16 is the run length count
+    private func decodeChiTuRLE15(_ data: Data, width: Int, height: Int) -> Data? {
+        let pixelCount = width * height
+        var rgba = [UInt8](repeating: 255, count: pixelCount * 4)
+        var pixelIndex = 0
+
+        data.withUnsafeBytes { buffer in
+            var i = 0
+            while i + 1 < buffer.count && pixelIndex < pixelCount {
+                let value = UInt16(buffer[i]) | (UInt16(buffer[i + 1]) << 8)
+                i += 2
+
+                let isRLE = (value & 0x0001) != 0
+                let color15 = value >> 1  // 15-bit color
+
+                // Decode RGB555: RRRRRGGGGGBBBBB
+                let r = (color15 >> 10) & 0x1F
+                let g = (color15 >> 5) & 0x1F
+                let b = color15 & 0x1F
+
+                let r8 = UInt8(r * 255 / 31)
+                let g8 = UInt8(g * 255 / 31)
+                let b8 = UInt8(b * 255 / 31)
+
+                var runLength = 1
+                if isRLE && i + 1 < buffer.count {
+                    runLength = Int(UInt16(buffer[i]) | (UInt16(buffer[i + 1]) << 8))
+                    i += 2
+                }
+
+                for _ in 0..<runLength {
+                    guard pixelIndex < pixelCount else { break }
+                    rgba[pixelIndex * 4 + 0] = r8
+                    rgba[pixelIndex * 4 + 1] = g8
+                    rgba[pixelIndex * 4 + 2] = b8
+                    rgba[pixelIndex * 4 + 3] = 255
+                    pixelIndex += 1
+                }
+            }
+        }
+
+        return createPNGFromRGBA(rgba, width: width, height: height)
+    }
+
+    /// Convert raw RGBA pixel buffer to PNG data using CoreGraphics
+    private func createPNGFromRGBA(_ rgba: [UInt8], width: Int, height: Int) -> Data? {
+        let bitsPerComponent = 8
+        let bitsPerPixel = 32
+        let bytesPerRow = width * 4
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+
+        guard let context = CGContext(
+            data: UnsafeMutableRawPointer(mutating: rgba),
+            width: width,
+            height: height,
+            bitsPerComponent: bitsPerComponent,
+            bytesPerRow: bytesPerRow,
+            space: colorSpace,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else { return nil }
+
+        guard let cgImage = context.makeImage() else { return nil }
+
+        #if canImport(UIKit)
+        let image = UIImage(cgImage: cgImage)
+        return image.pngData()
+        #elseif canImport(AppKit)
+        let image = NSImage(cgImage: cgImage, size: NSSize(width: width, height: height))
+        guard let tiffRep = image.tiffRepresentation,
+              let bitmapRep = NSBitmapImageRep(data: tiffRep) else { return nil }
+        return bitmapRep.representation(using: .png, properties: [:])
+        #else
+        return nil
+        #endif
     }
 }
 

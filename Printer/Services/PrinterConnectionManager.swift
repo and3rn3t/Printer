@@ -72,6 +72,12 @@ final class PrinterConnectionManager {
     /// Whether a status refresh is currently in progress
     private(set) var isRefreshing: Bool = false
 
+    /// Estimated print progress (0.0–1.0) for ACT printers based on elapsed time vs sliced metadata
+    private(set) var estimatedProgress: Double?
+
+    /// Estimated remaining time in seconds for ACT printers
+    private(set) var estimatedTimeRemaining: Int?
+
     /// The polling interval in seconds
     var pollingInterval: TimeInterval = 5
 
@@ -208,15 +214,35 @@ final class PrinterConnectionManager {
             // Detect print state transitions
             self.detectPrintTransition(newStatus: status)
 
+            // Calculate estimated progress from elapsed time vs sliced metadata
+            if status == .printing, let job = self.activeJob {
+                let elapsed = job.effectiveDuration
+                if let estimatedTotal = job.model?.slicedPrintTimeSeconds, estimatedTotal > 0 {
+                    let totalSeconds = Double(estimatedTotal)
+                    self.estimatedProgress = min(elapsed / totalSeconds, 0.99)
+                    self.estimatedTimeRemaining = max(Int(totalSeconds - elapsed), 0)
+                } else if elapsed > 0 {
+                    // No metadata — show elapsed but no percentage
+                    self.estimatedProgress = nil
+                    self.estimatedTimeRemaining = nil
+                }
+            } else {
+                self.estimatedProgress = nil
+                self.estimatedTimeRemaining = nil
+            }
+
             // Update Live Activity with current progress (ACT printers have limited progress info)
             #if os(iOS)
             if status == .printing {
                 let elapsed = Int(self.activeJob?.effectiveDuration ?? 0)
+                let progress = self.estimatedProgress ?? 0.0
+                let remaining = self.estimatedTimeRemaining
                 Task { @MainActor in
                     await PrintActivityManager.shared.updateActivity(
-                        progress: 0.0,  // ACT protocol doesn't report progress %
+                        progress: progress,
                         status: "Printing",
-                        elapsedSeconds: elapsed
+                        elapsedSeconds: elapsed,
+                        estimatedSecondsRemaining: remaining
                     )
                 }
             }

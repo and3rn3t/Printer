@@ -34,6 +34,12 @@ struct SettingsView: View {
     @State private var showingClearCacheConfirm = false
     @State private var showingDeleteAllConfirm = false
     @State private var showingClearHistoryConfirm = false
+    @State private var isRescanningLibrary = false
+    @State private var rescanProgress: Double = 0
+    @State private var rescanTotal: Int = 0
+    @State private var rescanCompleted: Int = 0
+    @State private var rescanResultMessage: String?
+    @State private var showingRescanResult = false
 
     var body: some View {
         NavigationStack {
@@ -71,6 +77,11 @@ struct SettingsView: View {
                 Button("Clear", role: .destructive) { clearPrintHistory() }
             } message: {
                 Text("This will permanently delete all print job history. This cannot be undone.")
+            }
+            .alert("Library Scan Complete", isPresented: $showingRescanResult) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text(rescanResultMessage ?? "Scan complete.")
             }
             .onAppear { calculateStorage() }
         }
@@ -152,8 +163,31 @@ struct SettingsView: View {
             Button("Clear Thumbnail Cache") {
                 showingClearCacheConfirm = true
             }
+
+            // Re-scan sliced files for metadata and thumbnails
+            if isRescanningLibrary {
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text("Scanning Library…")
+                        Spacer()
+                        Text("\(rescanCompleted)/\(rescanTotal)")
+                            .foregroundStyle(.secondary)
+                    }
+                    ProgressView(value: rescanProgress)
+                        .tint(.blue)
+                }
+            } else {
+                Button {
+                    rescanLibrary()
+                } label: {
+                    Label("Re-scan Slice Metadata", systemImage: "arrow.clockwise")
+                }
+                .disabled(models.isEmpty)
+            }
         } header: {
             Label("Storage", systemImage: "internaldrive")
+        } footer: {
+            Text("Re-scan parses metadata and extracts thumbnails from sliced files that are missing them.")
         }
     }
 
@@ -234,6 +268,76 @@ struct SettingsView: View {
                 try? await STLFileManager.shared.deleteSTL(at: model.resolvedFileURL.path)
             }
             modelContext.delete(model)
+        }
+    }
+
+    /// Re-scan all sliced models for missing metadata and thumbnails
+    private func rescanLibrary() {
+        let slicedModels = models.filter { $0.fileType.isSliced }
+        let needsMetadata = slicedModels.filter { !$0.hasSlicedMetadata }
+        let needsThumbnail = slicedModels.filter { $0.thumbnailData == nil }
+
+        // Models that need either metadata or thumbnail
+        let modelsToScan = slicedModels.filter { !$0.hasSlicedMetadata || $0.thumbnailData == nil }
+
+        guard !modelsToScan.isEmpty else {
+            rescanResultMessage = "All \(slicedModels.count) sliced models already have metadata and thumbnails."
+            showingRescanResult = true
+            return
+        }
+
+        isRescanningLibrary = true
+        rescanTotal = modelsToScan.count
+        rescanCompleted = 0
+        rescanProgress = 0
+
+        Task {
+            let parser = SlicedFileParser()
+            var metadataParsed = 0
+            var thumbnailsExtracted = 0
+
+            for model in modelsToScan {
+                let fileURL = model.resolvedFileURL
+
+                // Parse metadata if missing
+                if !model.hasSlicedMetadata {
+                    if let metadata = await parser.parseMetadata(from: fileURL) {
+                        await MainActor.run {
+                            model.applyMetadata(metadata)
+                        }
+                        metadataParsed += 1
+                    }
+                }
+
+                // Extract thumbnail if missing
+                if model.thumbnailData == nil {
+                    if let thumbnail = await parser.extractThumbnail(from: fileURL) {
+                        await MainActor.run {
+                            model.thumbnailData = thumbnail
+                        }
+                        thumbnailsExtracted += 1
+                    }
+                }
+
+                await MainActor.run {
+                    rescanCompleted += 1
+                    rescanProgress = Double(rescanCompleted) / Double(rescanTotal)
+                }
+            }
+
+            await MainActor.run {
+                isRescanningLibrary = false
+
+                var parts: [String] = []
+                if metadataParsed > 0 { parts.append("\(metadataParsed) metadata parsed") }
+                if thumbnailsExtracted > 0 { parts.append("\(thumbnailsExtracted) thumbnails extracted") }
+                if parts.isEmpty {
+                    rescanResultMessage = "Scanned \(modelsToScan.count) files but no new data could be extracted."
+                } else {
+                    rescanResultMessage = "Scanned \(modelsToScan.count) files: \(parts.joined(separator: ", "))."
+                }
+                showingRescanResult = true
+            }
         }
     }
 }

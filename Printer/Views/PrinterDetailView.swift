@@ -72,6 +72,27 @@ struct PrinterDetailView: View {
                 }
             }
 
+            // USB file transfer note (ACT resin printers only)
+            if printer.printerProtocol == .act && manager.connectionState.isConnected {
+                Section {
+                    Label {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("USB File Transfer Required")
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                            Text("Resin printers using the ACT protocol do not support wireless file transfer. Copy sliced files (.pwmx) to a USB drive and insert it into the printer. Then use \"Send to Printer\" to start the print by filename.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    } icon: {
+                        Image(systemName: "usb")
+                            .foregroundStyle(.orange)
+                    }
+                } header: {
+                    Text("File Transfer")
+                }
+            }
+
             // Recent print history
             if !recentJobs.isEmpty {
                 recentHistorySection
@@ -289,8 +310,65 @@ struct PrinterDetailView: View {
                 LabeledContent("State", value: status.displayText)
             }
 
-            // ACT protocol doesn't provide progress percentage natively
-            // but the status (printing/paused) is shown in the hero section
+            // Show file name from active print job if available
+            if let fileName = manager.activeJob?.fileName {
+                LabeledContent("File", value: fileName)
+            }
+
+            // Show estimated progress based on elapsed time vs sliced metadata
+            if let progress = manager.estimatedProgress {
+                VStack(alignment: .leading, spacing: 6) {
+                    ProgressView(value: progress)
+                        .tint(progressColor(for: progress * 100))
+
+                    HStack {
+                        Text("\(Int(progress * 100))% estimated")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+
+                        Spacer()
+
+                        if let remaining = manager.estimatedTimeRemaining {
+                            Text("\(formatDuration(Double(remaining))) remaining")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+
+            // Show elapsed time for all ACT prints
+            if let job = manager.activeJob {
+                let elapsed = job.effectiveDuration
+                if elapsed > 0 {
+                    LabeledContent("Elapsed", value: formatDuration(elapsed))
+                }
+
+                // Show estimated total from sliced metadata
+                if let total = job.model?.slicedPrintTimeSeconds, total > 0 {
+                    LabeledContent("Estimated Total", value: formatDuration(Double(total)))
+                }
+
+                // Show estimated layer info
+                if let totalLayers = job.model?.slicedLayerCount, totalLayers > 0,
+                   let progress = manager.estimatedProgress {
+                    let currentLayer = Int(Double(totalLayers) * progress)
+                    LabeledContent("Layer") {
+                        Text("\(currentLayer) / \(totalLayers)")
+                    }
+                }
+            }
+
+            if manager.estimatedProgress == nil && manager.photonStatus == .printing {
+                Label {
+                    Text("Progress estimation unavailable — link a model with slice data for ETA")
+                        .font(.caption)
+                } icon: {
+                    Image(systemName: "info.circle")
+                }
+                .foregroundStyle(.secondary)
+            }
+
             if manager.photonStatus == .paused {
                 Label("Print is paused — resume or cancel below", systemImage: "pause.circle")
                     .font(.subheadline)

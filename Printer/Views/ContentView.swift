@@ -228,12 +228,13 @@ struct ContentView: View {
                 // Import the file
                 let (fileURL, fileSize) = try await STLFileManager.shared.importSTL(from: importURL)
                 
-                // Generate thumbnail only for mesh formats that SceneKit can render
-                let thumbnailData: Data?
+                // Generate thumbnail — SceneKit for mesh formats, binary extraction for sliced files
+                var thumbnailData: Data?
                 if fileType.needsSlicing && (ext == "stl" || ext == "obj" || ext == "usdz") {
                     thumbnailData = try? await converter.generateThumbnail(from: fileURL)
-                } else {
-                    thumbnailData = nil
+                } else if fileType.isSliced {
+                    let parser = SlicedFileParser()
+                    thumbnailData = await parser.extractThumbnail(from: fileURL)
                 }
                 
                 // Store as relative path for container resilience

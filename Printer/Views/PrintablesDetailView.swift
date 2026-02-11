@@ -336,6 +336,13 @@ struct PrintablesDetailView: View {
 
                 // Extract sliced file metadata if applicable
                 let fileModelType = ModelFileType.from(path: savedURL.path)
+
+                // Fall back to embedded sliced file thumbnail
+                if thumbnailData == nil && fileModelType.isSliced {
+                    let parser = SlicedFileParser()
+                    thumbnailData = await parser.extractThumbnail(from: savedURL)
+                }
+
                 var slicedMetadata: SlicedFileMetadata?
                 if fileModelType.isSliced {
                     let parser = SlicedFileParser()
