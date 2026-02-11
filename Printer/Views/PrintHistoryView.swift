@@ -448,6 +448,16 @@ struct PrintHistoryRowView: View {
                             .font(.caption2)
                         Text(job.formattedDuration)
                             .font(.caption)
+
+                        if let cost = estimatedCost {
+                            Text("·")
+                                .foregroundStyle(.tertiary)
+                            Image(systemName: "dollarsign.circle")
+                                .font(.caption2)
+                            Text(cost)
+                                .font(.caption)
+                                .fontWeight(.medium)
+                        }
                     }
                     .foregroundStyle(.secondary)
                 }
@@ -473,4 +483,27 @@ struct PrintHistoryRowView: View {
     private var statusIcon: String { job.status.icon }
     private var statusColor: Color { job.status.color }
     private var statusText: String { job.status.displayText }
+
+    /// Estimated cost based on resin volume and cost per mL
+    private var estimatedCost: String? {
+        guard let volume = job.model?.slicedVolumeMl, volume > 0 else { return nil }
+        let costPerMl = UserDefaults.standard.double(forKey: "resinCostPerMl")
+        guard costPerMl > 0 else { return nil }
+        let cost = Double(volume) * costPerMl
+        let currency = UserDefaults.standard.string(forKey: "resinCurrency") ?? "USD"
+        return formatCostString(cost, currency: currency)
+    }
+
+    private func formatCostString(_ cost: Double, currency: String) -> String {
+        let symbol: String
+        switch currency {
+        case "EUR": symbol = "\u{20AC}"
+        case "GBP": symbol = "\u{00A3}"
+        case "JPY": symbol = "\u{00A5}"
+        case "CAD": symbol = "CA$"
+        case "AUD": symbol = "A$"
+        default: symbol = "$"
+        }
+        return "\(symbol)\(String(format: "%.2f", cost))"
+    }
 }

@@ -23,6 +23,7 @@ struct ContentView: View {
     @State private var showingSettings = false
     @State private var showingPrintQueue = false
     @State private var showingStatistics = false
+    @State private var showingCollections = false
     @State private var columnVisibility = NavigationSplitViewVisibility.all
     @State private var errorMessage: String?
     @State private var showingError = false
@@ -40,6 +41,7 @@ struct ContentView: View {
                 showingSettings: $showingSettings,
                 showingPrintQueue: $showingPrintQueue,
                 showingStatistics: $showingStatistics,
+                showingCollections: $showingCollections,
                 onDelete: deleteModels
             )
         } detail: {
@@ -145,6 +147,9 @@ struct ContentView: View {
                         }
                     }
             }
+        }
+        .sheet(isPresented: $showingCollections) {
+            CollectionListView()
         }
         .alert("Error", isPresented: $showingError) {
             Button("OK", role: .cancel) { }
@@ -300,11 +305,17 @@ struct ModelListView: View {
     @Binding var showingSettings: Bool
     @Binding var showingPrintQueue: Bool
     @Binding var showingStatistics: Bool
+    @Binding var showingCollections: Bool
     let onDelete: (IndexSet) -> Void
 
     @AppStorage("defaultSortOption") private var sortOptionRaw = "Date (Newest)"
     @State private var searchText = ""
     @State private var filterOption: ModelFilterOption = .all
+    @State private var isSelectMode = false
+    @State private var selectedModelIDs: Set<UUID> = []
+    @State private var batchTagText = ""
+    @State private var showingBatchTag = false
+    @State private var showingBatchCollectionPicker = false
 
     private var sortOption: ModelSortOption {
         ModelSortOption(rawValue: sortOptionRaw) ?? .dateNewest
@@ -405,55 +416,82 @@ struct ModelListView: View {
                 .background(Color(.systemGroupedBackground))
 #endif
             } else {
-                List(selection: $selectedModel) {
-                    // Filter chips
-                    if !searchText.isEmpty || filterOption != .all {
-                        HStack {
-                            Text("\(filteredModels.count) of \(models.count) models")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            Spacer()
-                            if filterOption != .all {
-                                Button {
-                                    filterOption = .all
-                                } label: {
-                                    Label("Clear Filter", systemImage: "xmark.circle.fill")
-                                        .font(.caption)
+                ZStack(alignment: .bottom) {
+                    List(selection: isSelectMode ? nil : $selectedModel) {
+                        // Filter chips
+                        if !searchText.isEmpty || filterOption != .all {
+                            HStack {
+                                Text("\(filteredModels.count) of \(models.count) models")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                Spacer()
+                                if filterOption != .all {
+                                    Button {
+                                        filterOption = .all
+                                    } label: {
+                                        Label("Clear Filter", systemImage: "xmark.circle.fill")
+                                            .font(.caption)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .foregroundStyle(.secondary)
                                 }
-                                .buttonStyle(.plain)
-                                .foregroundStyle(.secondary)
                             }
+                            .listRowSeparator(.hidden)
                         }
-                        .listRowSeparator(.hidden)
-                    }
 
-                    ForEach(filteredModels) { model in
-                        NavigationLink(value: model) {
-                            ModelRowView(model: model)
-                        }
-                        .swipeActions(edge: .leading) {
-                            Button {
-                                model.isFavorite.toggle()
-                            } label: {
-                                Label(
-                                    model.isFavorite ? "Unfavorite" : "Favorite",
-                                    systemImage: model.isFavorite ? "star.slash" : "star.fill"
-                                )
-                            }
-                            .tint(.yellow)
-                        }
-                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                            Button(role: .destructive) {
-                                if let idx = models.firstIndex(of: model) {
-                                    onDelete(IndexSet(integer: idx))
+                        ForEach(filteredModels) { model in
+                            if isSelectMode {
+                                HStack(spacing: 12) {
+                                    Image(systemName: selectedModelIDs.contains(model.id) ? "checkmark.circle.fill" : "circle")
+                                        .foregroundStyle(selectedModelIDs.contains(model.id) ? .blue : .secondary)
+                                        .font(.title3)
+                                    ModelRowView(model: model)
                                 }
-                            } label: {
-                                Label("Delete", systemImage: "trash")
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    withAnimation(.easeInOut(duration: 0.15)) {
+                                        if selectedModelIDs.contains(model.id) {
+                                            selectedModelIDs.remove(model.id)
+                                        } else {
+                                            selectedModelIDs.insert(model.id)
+                                        }
+                                    }
+                                }
+                            } else {
+                                NavigationLink(value: model) {
+                                    ModelRowView(model: model)
+                                }
+                                .swipeActions(edge: .leading) {
+                                    Button {
+                                        model.isFavorite.toggle()
+                                    } label: {
+                                        Label(
+                                            model.isFavorite ? "Unfavorite" : "Favorite",
+                                            systemImage: model.isFavorite ? "star.slash" : "star.fill"
+                                        )
+                                    }
+                                    .tint(.yellow)
+                                }
+                                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                    Button(role: .destructive) {
+                                        if let idx = models.firstIndex(of: model) {
+                                            onDelete(IndexSet(integer: idx))
+                                        }
+                                    } label: {
+                                        Label("Delete", systemImage: "trash")
+                                    }
+                                }
                             }
                         }
+                    }
+                    .searchable(text: $searchText, prompt: "Search models")
+
+                    // Batch action bar
+                    if isSelectMode && !selectedModelIDs.isEmpty {
+                        batchActionBar
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
                     }
                 }
-                .searchable(text: $searchText, prompt: "Search models")
             }
         }
         .navigationTitle("3D Models")
@@ -463,7 +501,14 @@ struct ModelListView: View {
         .toolbar {
 #if os(iOS)
             ToolbarItem(placement: .navigationBarTrailing) {
-                EditButton()
+                Button(isSelectMode ? "Done" : "Select") {
+                    withAnimation {
+                        isSelectMode.toggle()
+                        if !isSelectMode {
+                            selectedModelIDs.removeAll()
+                        }
+                    }
+                }
             }
 #endif
             ToolbarItem(placement: .primaryAction) {
@@ -556,6 +601,14 @@ struct ModelListView: View {
 
             ToolbarItem(placement: .primaryAction) {
                 Button {
+                    showingCollections = true
+                } label: {
+                    Label("Collections", systemImage: "folder")
+                }
+            }
+
+            ToolbarItem(placement: .primaryAction) {
+                Button {
                     showingPrinterSetup = true
                 } label: {
                     Label("Printers", systemImage: "printer")
@@ -570,6 +623,164 @@ struct ModelListView: View {
                 }
             }
         }
+        .alert("Add Tag", isPresented: $showingBatchTag) {
+            TextField("Tag name", text: $batchTagText)
+            Button("Cancel", role: .cancel) { batchTagText = "" }
+            Button("Add") {
+                batchAddTag(batchTagText)
+                batchTagText = ""
+            }
+        } message: {
+            Text("Add a tag to \(selectedModelIDs.count) selected models")
+        }
+        .sheet(isPresented: $showingBatchCollectionPicker) {
+            BatchAddToCollectionView(modelIDs: selectedModelIDs, allModels: models)
+        }
+    }
+
+    // MARK: - Batch Actions
+
+    @ViewBuilder
+    private var batchActionBar: some View {
+        HStack(spacing: 16) {
+            Text("\(selectedModelIDs.count) selected")
+                .font(.subheadline)
+                .fontWeight(.medium)
+
+            Spacer()
+
+            Button {
+                batchToggleFavorite()
+            } label: {
+                Image(systemName: "star.fill")
+            }
+            .foregroundStyle(.yellow)
+
+            Button {
+                showingBatchTag = true
+            } label: {
+                Image(systemName: "tag.fill")
+            }
+            .foregroundStyle(.blue)
+
+            Button {
+                showingBatchCollectionPicker = true
+            } label: {
+                Image(systemName: "folder.badge.plus")
+            }
+            .foregroundStyle(.purple)
+
+            Button(role: .destructive) {
+                batchDelete()
+            } label: {
+                Image(systemName: "trash.fill")
+            }
+            .foregroundStyle(.red)
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 12)
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .shadow(color: .black.opacity(0.15), radius: 8, y: 4)
+        .padding(.horizontal)
+        .padding(.bottom, 8)
+    }
+
+    private func batchToggleFavorite() {
+        let selected = models.filter { selectedModelIDs.contains($0.id) }
+        let allFavorited = selected.allSatisfy(\.isFavorite)
+        withAnimation {
+            for model in selected {
+                model.isFavorite = !allFavorited
+            }
+        }
+    }
+
+    private func batchAddTag(_ tag: String) {
+        let trimmed = tag.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return }
+        let selected = models.filter { selectedModelIDs.contains($0.id) }
+        for model in selected {
+            if !model.tags.contains(trimmed) {
+                model.tags.append(trimmed)
+            }
+        }
+    }
+
+    private func batchDelete() {
+        withAnimation {
+            for model in models where selectedModelIDs.contains(model.id) {
+                if let idx = models.firstIndex(of: model) {
+                    onDelete(IndexSet(integer: idx))
+                }
+            }
+            selectedModelIDs.removeAll()
+            isSelectMode = false
+        }
+    }
+}
+
+// MARK: - Batch Add to Collection
+
+/// Sheet for adding multiple selected models to a collection at once.
+struct BatchAddToCollectionView: View {
+    let modelIDs: Set<UUID>
+    let allModels: [PrintModel]
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
+    @Query(sort: \ModelCollection.name) private var collections: [ModelCollection]
+
+    var body: some View {
+        NavigationStack {
+            Group {
+                if collections.isEmpty {
+                    ContentUnavailableView(
+                        "No Collections",
+                        systemImage: "folder.badge.plus",
+                        description: Text("Create a collection first in the Collections view")
+                    )
+                } else {
+                    List {
+                        ForEach(collections) { collection in
+                            Button {
+                                addToCollection(collection)
+                                dismiss()
+                            } label: {
+                                HStack(spacing: 12) {
+                                    Image(systemName: collection.icon)
+                                        .foregroundStyle(Color(hex: collection.colorHex) ?? .blue)
+                                    Text(collection.name)
+                                    Spacer()
+                                    Text("\(collection.models.count)")
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            .foregroundStyle(.primary)
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Add to Collection")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+            }
+        }
+    }
+
+    private func addToCollection(_ collection: ModelCollection) {
+        let selected = allModels.filter { modelIDs.contains($0.id) }
+        let existingIDs = Set(collection.models.map(\.id))
+        for model in selected {
+            if !existingIDs.contains(model.id) {
+                collection.models.append(model)
+            }
+        }
+        collection.modifiedDate = Date()
     }
 }
 

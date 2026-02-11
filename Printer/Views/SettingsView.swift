@@ -26,6 +26,9 @@ struct SettingsView: View {
     @AppStorage("showSlicingWarnings") private var showSlicingWarnings = true
     @AppStorage("defaultSortOption") private var defaultSortOption = "Date (Newest)"
     @AppStorage("confirmBeforeDelete") private var confirmBeforeDelete = true
+    @AppStorage("enablePrintNotifications") private var enablePrintNotifications = true
+    @AppStorage("resinCostPerMl") private var resinCostPerMl: Double = 0.0
+    @AppStorage("resinCurrency") private var resinCurrency: String = "USD"
 
     // MARK: State
 
@@ -47,6 +50,8 @@ struct SettingsView: View {
                 printerSection
                 librarySection
                 printingSection
+                notificationsSection
+                costSection
                 storageSection
                 dataSection
                 aboutSection
@@ -134,6 +139,53 @@ struct SettingsView: View {
             Label("Printing", systemImage: "paintbrush.pointed")
         } footer: {
             Text("Slicing warnings remind you when a model format isn't directly printable on resin printers.")
+        }
+    }
+
+    private var notificationsSection: some View {
+        Section {
+            Toggle("Print Notifications", isOn: $enablePrintNotifications)
+                .onChange(of: enablePrintNotifications) { _, enabled in
+                    if enabled {
+                        Task {
+                            await PrintNotificationManager.shared.requestAuthorization()
+                        }
+                    }
+                }
+        } header: {
+            Label("Notifications", systemImage: "bell.badge")
+        } footer: {
+            Text("Receive a notification when a print finishes, fails, or is cancelled.")
+        }
+    }
+
+    private var costSection: some View {
+        Section {
+            HStack {
+                Text("Resin Cost")
+                Spacer()
+                TextField("0.00", value: $resinCostPerMl, format: .number.precision(.fractionLength(2)))
+                    .multilineTextAlignment(.trailing)
+                    .frame(width: 80)
+                    #if os(iOS)
+                    .keyboardType(.decimalPad)
+                    #endif
+                Text("/ mL")
+                    .foregroundStyle(.secondary)
+            }
+
+            Picker("Currency", selection: $resinCurrency) {
+                Text("USD ($)").tag("USD")
+                Text("EUR (\u{20AC})").tag("EUR")
+                Text("GBP (\u{00A3})").tag("GBP")
+                Text("CAD (CA$)").tag("CAD")
+                Text("AUD (A$)").tag("AUD")
+                Text("JPY (\u{00A5})").tag("JPY")
+            }
+        } header: {
+            Label("Cost Tracking", systemImage: "dollarsign.circle")
+        } footer: {
+            Text("Set your resin cost per milliliter to see estimated costs on print jobs and statistics.")
         }
     }
 

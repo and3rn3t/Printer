@@ -611,6 +611,55 @@ actor AnycubicPrinterAPI {
 
     // MARK: - Connection Health
 
+    /// Fetch the webcam snapshot URL from OctoPrint settings
+    ///
+    /// Queries `/api/settings` and extracts the webcam snapshot URL.
+    /// Returns `nil` if no webcam is configured or the printer doesn't support it.
+    func getWebcamSnapshotURL(
+        ipAddress: String,
+        apiKey: String?
+    ) async -> URL? {
+        guard let url = URL(string: "http://\(ipAddress)/api/settings") else { return nil }
+
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 10
+        if let apiKey {
+            request.setValue(apiKey, forHTTPHeaderField: "X-Api-Key")
+        }
+
+        do {
+            let (data, response) = try await urlSession.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse,
+                  httpResponse.statusCode == 200 else { return nil }
+
+            guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let webcam = json["webcam"] as? [String: Any] else { return nil }
+
+            // Try snapshotUrl first, then streamUrl
+            if let snapshotUrlString = webcam["snapshotUrl"] as? String, !snapshotUrlString.isEmpty {
+                // Resolve relative URLs
+                if snapshotUrlString.hasPrefix("http") {
+                    return URL(string: snapshotUrlString)
+                } else {
+                    return URL(string: "http://\(ipAddress)\(snapshotUrlString)")
+                }
+            }
+
+            if let streamUrlString = webcam["streamUrl"] as? String, !streamUrlString.isEmpty {
+                if streamUrlString.hasPrefix("http") {
+                    return URL(string: streamUrlString)
+                } else {
+                    return URL(string: "http://\(ipAddress)\(streamUrlString)")
+                }
+            }
+
+            return nil
+        } catch {
+            return nil
+        }
+    }
+
     /// Check if printer is reachable (lightweight ping)
     func isReachable(ipAddress: String) async -> Bool {
         // Try ACT protocol first (fastest for Photon printers)

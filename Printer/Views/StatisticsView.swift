@@ -124,6 +124,15 @@ struct StatisticsView: View {
                 icon: "cube.fill",
                 color: .orange
             )
+
+            if totalEstimatedCost > 0 {
+                StatCard(
+                    title: "Est. Cost",
+                    value: formattedTotalCost,
+                    icon: "dollarsign.circle.fill",
+                    color: .green
+                )
+            }
         }
         .padding(.horizontal)
     }
@@ -463,6 +472,31 @@ struct StatisticsView: View {
             .filter { $0.status == .completed }
             .compactMap { $0.model?.slicedPrintHeight }
             .reduce(0, +)
+    }
+
+    /// Total estimated cost based on resin volume and cost per mL
+    private var totalEstimatedCost: Double {
+        let costPerMl = UserDefaults.standard.double(forKey: "resinCostPerMl")
+        guard costPerMl > 0 else { return 0 }
+        let totalVolume = filteredJobs
+            .filter { $0.status == .completed }
+            .compactMap { $0.model?.slicedVolumeMl }
+            .reduce(Float(0), +)
+        return Double(totalVolume) * costPerMl
+    }
+
+    private var formattedTotalCost: String {
+        let currency = UserDefaults.standard.string(forKey: "resinCurrency") ?? "USD"
+        let symbol: String
+        switch currency {
+        case "EUR": symbol = "\u{20AC}"
+        case "GBP": symbol = "\u{00A3}"
+        case "JPY": symbol = "\u{00A5}"
+        case "CAD": symbol = "CA$"
+        case "AUD": symbol = "A$"
+        default: symbol = "$"
+        }
+        return "\(symbol)\(String(format: "%.2f", totalEstimatedCost))"
     }
 }
 

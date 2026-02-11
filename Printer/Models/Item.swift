@@ -127,6 +127,9 @@ final class PrintModel {
     @Relationship(deleteRule: .cascade)
     var printJobs: [PrintJob]
 
+    /// Collections this model belongs to (many-to-many)
+    var collections: [ModelCollection]
+
     /// Inferred file type based on path extension
     var fileType: ModelFileType {
         ModelFileType.from(path: fileURL)
@@ -198,6 +201,7 @@ final class PrintModel {
         self.isFavorite = isFavorite
         self.tags = tags
         self.printJobs = []
+        self.collections = []
     }
 }
 enum ModelSource: Codable {
@@ -333,7 +337,10 @@ final class Printer {
     
     /// Firmware version reported by printer
     var firmwareVersion: String?
-    
+
+    /// Resin cost per milliliter for this printer (overrides global setting)
+    var resinCostPerMl: Double?
+
     init(
         name: String,
         ipAddress: String,

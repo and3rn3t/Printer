@@ -24,6 +24,7 @@ struct ModelDetailView: View {
     @State private var showingTagEditor = false
     @State private var newTag = ""
     @State private var show3DPreview = false
+    @State private var showingCollectionPicker = false
     
     /// Whether this model supports interactive 3D preview
     private var canShow3D: Bool {
@@ -464,6 +465,20 @@ struct ModelDetailView: View {
 
                     // File management actions
                     HStack(spacing: 16) {
+                        Button {
+                            showingCollectionPicker = true
+                        } label: {
+                            HStack {
+                                Image(systemName: "folder.badge.plus")
+                                Text("Collect")
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.gray.opacity(0.15))
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                        }
+                        .buttonStyle(.plain)
+
                         ShareLink(item: model.resolvedFileURL) {
                             HStack {
                                 Image(systemName: "square.and.arrow.up")
@@ -507,6 +522,9 @@ struct ModelDetailView: View {
 #endif
         .sheet(isPresented: $showingPrintSheet) {
             PrintJobView(model: model, printers: printers)
+        }
+        .sheet(isPresented: $showingCollectionPicker) {
+            AddToCollectionPicker(model: model)
         }
         .alert("Delete Model", isPresented: $showingDeleteConfirm) {
             Button("Cancel", role: .cancel) { }

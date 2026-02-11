@@ -19,6 +19,7 @@ struct PrinterDetailView: View {
     @State private var controlError: String?
     @State private var showingControlError = false
     @State private var showingEditPrinter = false
+    @State private var webcamURL: URL?
 
     /// Recent jobs for this printer
     private var recentJobs: [PrintJob] {
@@ -47,6 +48,13 @@ struct PrinterDetailView: View {
             // Print controls
             if manager.connectionState.isConnected {
                 printControlsSection
+            }
+
+            // Webcam feed (OctoPrint with webcam configured)
+            if let webcamURL {
+                Section("Camera") {
+                    WebcamStreamView(snapshotURL: webcamURL, refreshInterval: 2.0)
+                }
             }
 
             // System information
@@ -123,6 +131,17 @@ struct PrinterDetailView: View {
         .onAppear {
             manager.modelContext = modelContext
             manager.startMonitoring(printer)
+            // Fetch webcam URL for OctoPrint printers
+            if printer.printerProtocol == .octoprint {
+                Task {
+                    let api = AnycubicPrinterAPI()
+                    let url = await api.getWebcamSnapshotURL(
+                        ipAddress: printer.ipAddress,
+                        apiKey: printer.apiKey
+                    )
+                    await MainActor.run { webcamURL = url }
+                }
+            }
         }
         .onDisappear {
             manager.stopMonitoring()

@@ -21,6 +21,7 @@ struct EditPrinterView: View {
     @State private var apiKey: String
     @State private var model: String
     @State private var selectedProtocol: PrinterProtocol
+    @State private var resinCostPerMl: String
     @State private var isTestingConnection = false
     @State private var connectionTestResult: Result<Bool, Error>?
 
@@ -32,6 +33,7 @@ struct EditPrinterView: View {
         _apiKey = State(initialValue: printer.apiKey ?? "")
         _model = State(initialValue: printer.model)
         _selectedProtocol = State(initialValue: printer.printerProtocol)
+        _resinCostPerMl = State(initialValue: printer.resinCostPerMl.map { String(format: "%.2f", $0) } ?? "")
     }
 
     var body: some View {
@@ -81,6 +83,25 @@ struct EditPrinterView: View {
                     if selectedProtocol == .octoprint {
                         TextField("API Key", text: $apiKey)
                     }
+                }
+
+                Section {
+                    HStack {
+                        Text("Resin Cost")
+                        Spacer()
+                        TextField("0.00", text: $resinCostPerMl)
+                            .multilineTextAlignment(.trailing)
+                            .frame(width: 80)
+                            #if os(iOS)
+                            .keyboardType(.decimalPad)
+                            #endif
+                        Text("/ mL")
+                            .foregroundStyle(.secondary)
+                    }
+                } header: {
+                    Text("Cost")
+                } footer: {
+                    Text("Per-printer cost overrides the global setting. Leave blank to use the global resin cost.")
                 }
 
                 Section {
@@ -170,6 +191,7 @@ struct EditPrinterView: View {
         printer.apiKey = apiKey.isEmpty ? nil : apiKey
         printer.model = model
         printer.printerProtocol = selectedProtocol
+        printer.resinCostPerMl = Double(resinCostPerMl)
         dismiss()
     }
 }

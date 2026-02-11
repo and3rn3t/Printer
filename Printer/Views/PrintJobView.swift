@@ -78,6 +78,67 @@ struct PrintJobView: View {
                         }
                     }
                 }
+
+                // Print estimate from sliced metadata
+                if model.hasSlicedMetadata {
+                    Section("Print Estimate") {
+                        if let time = model.slicedPrintTimeSeconds, time > 0 {
+                            LabeledContent("Estimated Time") {
+                                Text(formatDuration(Double(time)))
+                                    .fontWeight(.medium)
+                            }
+                        }
+
+                        if let layers = model.slicedLayerCount, layers > 0 {
+                            LabeledContent("Layers", value: "\(layers)")
+                        }
+
+                        if let volume = model.slicedVolumeMl, volume > 0 {
+                            LabeledContent("Resin Volume") {
+                                Text(String(format: "%.1f mL", volume))
+                            }
+                        }
+
+                        if let volume = model.slicedVolumeMl, volume > 0 {
+                            let costPerMl = UserDefaults.standard.double(forKey: "resinCostPerMl")
+                            if costPerMl > 0 {
+                                let cost = Double(volume) * costPerMl
+                                let currency = UserDefaults.standard.string(forKey: "resinCurrency") ?? "USD"
+                                LabeledContent("Estimated Cost") {
+                                    Text(Self.formatCost(cost, currency: currency))
+                                        .fontWeight(.semibold)
+                                        .foregroundStyle(.blue)
+                                }
+                            }
+                        }
+
+                        if let height = model.slicedPrintHeight, height > 0 {
+                            LabeledContent("Print Height") {
+                                Text(String(format: "%.1f mm", height))
+                            }
+                        }
+
+                        if let layerH = model.slicedLayerHeight, layerH > 0 {
+                            LabeledContent("Layer Height") {
+                                Text(String(format: "%.3f mm", layerH))
+                            }
+                        }
+
+                        if let exposure = model.slicedExposureTime, exposure > 0 {
+                            LabeledContent("Exposure", value: String(format: "%.1fs", exposure))
+                        }
+                    }
+                } else if !model.fileType.isSliced {
+                    Section {
+                        Label {
+                            Text("No print estimate available — this file has not been sliced. Slice it in your slicer software to see time, layer, and cost estimates.")
+                                .font(.caption)
+                        } icon: {
+                            Image(systemName: "info.circle")
+                        }
+                        .foregroundStyle(.secondary)
+                    }
+                }
                 
                 // ACT printer: file must already be on USB
                 if isACTPrinter {
@@ -222,6 +283,19 @@ struct PrintJobView: View {
     
     // MARK: - Upload
     
+    private static func formatCost(_ cost: Double, currency: String) -> String {
+        let symbol: String
+        switch currency {
+        case "EUR": symbol = "\u{20AC}"
+        case "GBP": symbol = "\u{00A3}"
+        case "JPY": symbol = "\u{00A5}"
+        case "CAD": symbol = "CA$"
+        case "AUD": symbol = "A$"
+        default: symbol = "$"
+        }
+        return "\(symbol)\(String(format: "%.2f", cost))"
+    }
+
     private func sendToPrinter() {
         guard let printer = selectedPrinter else { return }
         

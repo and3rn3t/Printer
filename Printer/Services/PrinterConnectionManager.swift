@@ -496,6 +496,18 @@ final class PrinterConnectionManager {
         }
         #endif
 
+        // Local notification
+        let notifFileName = activeJob?.fileName
+        let notifPrinterName = activeJob?.printerName ?? "Printer"
+        let notifDuration = activeJob?.effectiveDuration ?? 0
+        let notifStatus = status == .completed ? "Completed" : (status == .cancelled ? "Cancelled" : "Failed")
+        PrintNotificationManager.shared.notifyPrintFinished(
+            fileName: notifFileName,
+            printerName: notifPrinterName,
+            status: notifStatus,
+            duration: notifDuration
+        )
+
         printSessionStart = nil
         activeJob = nil
     }

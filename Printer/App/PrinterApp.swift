@@ -18,6 +18,7 @@ struct PrinterApp: App {
             PrintModel.self,
             PrintJob.self,
             Printer.self,
+            ModelCollection.self,
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 
@@ -33,6 +34,10 @@ struct PrinterApp: App {
             ContentView()
                 .task {
                     cleanupOldJobs()
+                    // Request notification permission if enabled
+                    if UserDefaults.standard.bool(forKey: "enablePrintNotifications") {
+                        await PrintNotificationManager.shared.requestAuthorization()
+                    }
                 }
         }
         .modelContainer(sharedModelContainer)
