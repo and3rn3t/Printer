@@ -80,15 +80,66 @@ final class PrintJob {
     var status: PrintStatus
     var printerName: String
     var model: PrintModel?
-    
+
+    /// Name of the file being printed
+    var fileName: String?
+
+    /// IP address of the printer used
+    var printerIP: String?
+
+    /// Protocol used for this job
+    var jobProtocol: String?
+
+    /// Total elapsed print time in seconds (accumulated across pause/resume)
+    var elapsedTime: TimeInterval
+
+    /// Timestamp when the print actually started on the printer (vs. when the job record was created)
+    var printStartDate: Date?
+
+    /// Duration of the print in a human-readable format
+    var formattedDuration: String {
+        let seconds = effectiveDuration
+        guard seconds > 0 else { return "—" }
+        let hours = Int(seconds) / 3600
+        let minutes = (Int(seconds) % 3600) / 60
+        let secs = Int(seconds) % 60
+        if hours > 0 {
+            return "\(hours)h \(minutes)m"
+        } else if minutes > 0 {
+            return "\(minutes)m \(secs)s"
+        }
+        return "\(secs)s"
+    }
+
+    /// Best available duration: stored elapsed time, or calculated from start/end dates
+    var effectiveDuration: TimeInterval {
+        if elapsedTime > 0 {
+            return elapsedTime
+        }
+        guard let end = endDate else {
+            // Still running — compute from start
+            let start = printStartDate ?? startDate
+            return Date().timeIntervalSince(start)
+        }
+        let start = printStartDate ?? startDate
+        return end.timeIntervalSince(start)
+    }
+
     init(
         printerName: String,
-        status: PrintStatus = .preparing
+        status: PrintStatus = .preparing,
+        fileName: String? = nil,
+        printerIP: String? = nil,
+        jobProtocol: String? = nil
     ) {
         self.id = UUID()
         self.startDate = Date()
         self.status = status
         self.printerName = printerName
+        self.fileName = fileName
+        self.printerIP = printerIP
+        self.jobProtocol = jobProtocol
+        self.elapsedTime = 0
     }
 }
 

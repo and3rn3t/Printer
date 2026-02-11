@@ -177,7 +177,13 @@ struct PrintJobView: View {
         Task {
             do {
                 // Create print job
-                let job = PrintJob(printerName: printer.name, status: .uploading)
+                let job = PrintJob(
+                    printerName: printer.name,
+                    status: .uploading,
+                    fileName: "\(model.name).stl",
+                    printerIP: printer.ipAddress,
+                    jobProtocol: printer.printerProtocol.rawValue
+                )
                 job.model = model
                 model.printJobs.append(job)
                 modelContext.insert(job)
@@ -210,6 +216,7 @@ struct PrintJobView: View {
                     }
                     
                     job.status = .printing
+                    job.printStartDate = Date()
                     try await api.startPrint(
                         ipAddress: printer.ipAddress,
                         apiKey: printer.apiKey,

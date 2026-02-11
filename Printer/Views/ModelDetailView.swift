@@ -302,9 +302,24 @@ struct PrintJobRowView: View {
                     .font(.subheadline)
                     .fontWeight(.medium)
                 
-                Text(job.startDate.formatted(date: .abbreviated, time: .shortened))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                HStack(spacing: 6) {
+                    Text(job.startDate.formatted(date: .abbreviated, time: .shortened))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    if job.effectiveDuration > 0 {
+                        Text("·")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                        HStack(spacing: 2) {
+                            Image(systemName: "clock")
+                                .font(.caption2)
+                            Text(job.formattedDuration)
+                                .font(.caption)
+                        }
+                        .foregroundStyle(.secondary)
+                    }
+                }
             }
             
             Spacer()

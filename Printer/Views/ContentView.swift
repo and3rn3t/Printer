@@ -18,6 +18,7 @@ struct ContentView: View {
     @State private var showingScanner = false
     @State private var showingImporter = false
     @State private var showingPrinterSetup = false
+    @State private var showingPrintHistory = false
     @State private var columnVisibility = NavigationSplitViewVisibility.all
     @State private var errorMessage: String?
     @State private var showingError = false
@@ -103,15 +104,35 @@ struct ContentView: View {
         }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button {
-                    showingPrinterSetup = true
-                } label: {
-                    Label("Printers", systemImage: "printer")
+                HStack(spacing: 12) {
+                    Button {
+                        showingPrintHistory = true
+                    } label: {
+                        Label("History", systemImage: "clock.arrow.circlepath")
+                    }
+
+                    Button {
+                        showingPrinterSetup = true
+                    } label: {
+                        Label("Printers", systemImage: "printer")
+                    }
                 }
             }
         }
         .sheet(isPresented: $showingPrinterSetup) {
             PrinterManagementView()
+        }
+        .sheet(isPresented: $showingPrintHistory) {
+            NavigationStack {
+                PrintHistoryView()
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Done") {
+                                showingPrintHistory = false
+                            }
+                        }
+                    }
+            }
         }
         .alert("Error", isPresented: $showingError) {
             Button("OK", role: .cancel) { }

@@ -6,15 +6,26 @@
 //
 
 import SwiftUI
+import SwiftData
 
 /// Detailed view for a single printer with live status, system info, and print controls.
 ///
 /// Uses `PrinterConnectionManager` for real-time polling and connection state tracking.
 struct PrinterDetailView: View {
     @Bindable var printer: Printer
+    @Environment(\.modelContext) private var modelContext
+    @Query(sort: \PrintJob.startDate, order: .reverse) private var allJobs: [PrintJob]
     @State private var manager = PrinterConnectionManager()
     @State private var controlError: String?
     @State private var showingControlError = false
+
+    /// Recent jobs for this printer
+    private var recentJobs: [PrintJob] {
+        allJobs
+            .filter { $0.printerName == printer.name }
+            .prefix(5)
+            .map { $0 }
+    }
 
     var body: some View {
         List {
@@ -40,6 +51,11 @@ struct PrinterDetailView: View {
             // System information
             systemInfoSection
 
+            // Recent print history
+            if !recentJobs.isEmpty {
+                recentHistorySection
+            }
+
             // Connection details
             connectionDetailsSection
         }
@@ -48,6 +64,7 @@ struct PrinterDetailView: View {
             await manager.refresh()
         }
         .onAppear {
+            manager.modelContext = modelContext
             manager.startMonitoring(printer)
         }
         .onDisappear {
@@ -415,6 +432,28 @@ struct PrinterDetailView: View {
         case .act: return "ACT (TCP \(printer.port))"
         case .octoprint: return "OctoPrint"
         case .anycubicHTTP: return "Anycubic HTTP"
+        }
+    }
+
+    // MARK: - Recent Print History
+
+    @ViewBuilder
+    private var recentHistorySection: some View {
+        Section {
+            ForEach(recentJobs) { job in
+                PrintHistoryRowView(job: job)
+            }
+        } header: {
+            HStack {
+                Text("Recent Prints")
+                Spacer()
+                NavigationLink {
+                    PrintHistoryView()
+                } label: {
+                    Text("See All")
+                        .font(.caption)
+                }
+            }
         }
     }
 

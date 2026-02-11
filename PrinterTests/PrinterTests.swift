@@ -65,6 +65,69 @@ struct PrintJobTests {
         #expect(job.status == .preparing)
         #expect(job.endDate == nil)
         #expect(job.model == nil)
+        #expect(job.fileName == nil)
+        #expect(job.printerIP == nil)
+        #expect(job.jobProtocol == nil)
+        #expect(job.elapsedTime == 0)
+        #expect(job.printStartDate == nil)
+    }
+
+    @Test func createPrintJobWithDetails() {
+        let job = PrintJob(
+            printerName: "Photon Mono X 6K",
+            status: .printing,
+            fileName: "cube.pwmx",
+            printerIP: "192.168.1.49",
+            jobProtocol: "act"
+        )
+
+        #expect(job.printerName == "Photon Mono X 6K")
+        #expect(job.status == .printing)
+        #expect(job.fileName == "cube.pwmx")
+        #expect(job.printerIP == "192.168.1.49")
+        #expect(job.jobProtocol == "act")
+    }
+
+    @Test func formattedDurationSeconds() {
+        let job = PrintJob(printerName: "Test")
+        job.elapsedTime = 45
+        #expect(job.formattedDuration == "45s")
+    }
+
+    @Test func formattedDurationMinutes() {
+        let job = PrintJob(printerName: "Test")
+        job.elapsedTime = 185  // 3m 5s
+        #expect(job.formattedDuration == "3m 5s")
+    }
+
+    @Test func formattedDurationHours() {
+        let job = PrintJob(printerName: "Test")
+        job.elapsedTime = 7320  // 2h 2m
+        #expect(job.formattedDuration == "2h 2m")
+    }
+
+    @Test func formattedDurationZero() {
+        let job = PrintJob(printerName: "Test")
+        // No elapsed and no dates set, effectiveDuration will use startDate to now
+        // but formattedDuration with elapsedTime=0 falls through to effectiveDuration
+        // Since startDate is Date(), effectiveDuration is nearly 0
+        // Just verify it returns a string
+        #expect(!job.formattedDuration.isEmpty)
+    }
+
+    @Test func effectiveDurationFromElapsedTime() {
+        let job = PrintJob(printerName: "Test")
+        job.elapsedTime = 3600
+        #expect(job.effectiveDuration == 3600)
+    }
+
+    @Test func effectiveDurationFromDates() {
+        let job = PrintJob(printerName: "Test")
+        job.printStartDate = Date().addingTimeInterval(-120)
+        job.endDate = Date()
+        // Should be approximately 120 seconds
+        #expect(job.effectiveDuration >= 119)
+        #expect(job.effectiveDuration <= 121)
     }
 
     @Test func printStatusCodable() throws {

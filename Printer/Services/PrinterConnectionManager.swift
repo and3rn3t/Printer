@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import SwiftData
 
 /// Manages live connection state and periodic status polling for a printer.
 ///
@@ -72,6 +73,23 @@ final class PrinterConnectionManager {
 
     /// The polling interval in seconds
     var pollingInterval: TimeInterval = 5
+
+    // MARK: - Print Session Tracking
+
+    /// The currently active print job being tracked (auto-created on print start)
+    private(set) var activeJob: PrintJob?
+
+    /// Previous status used to detect transitions (e.g. idle → printing)
+    private var previousPhotonStatus: PhotonPrinterService.PhotonStatus?
+
+    /// Previous HTTP print state
+    private var previousHTTPState: String?
+
+    /// Timestamp when the current print session began (for elapsed time)
+    private var printSessionStart: Date?
+
+    /// The model context for creating/updating PrintJob records
+    var modelContext: ModelContext?
 
     // MARK: - Private Properties
 
@@ -177,6 +195,9 @@ final class PrinterConnectionManager {
             self.photonStatus = status
             self.printerStatus = printerStat
 
+            // Detect print state transitions
+            self.detectPrintTransition(newStatus: status)
+
             // Update printer model with firmware if we have sysinfo
             if let sysInfo = self.systemInfo {
                 printer.firmwareVersion = sysInfo.firmwareVersion
@@ -204,6 +225,14 @@ final class PrinterConnectionManager {
         await MainActor.run {
             self.printerStatus = status
             self.jobStatus = job
+
+            // Detect HTTP print state transitions
+            self.detectHTTPTransition(newState: status.state.text)
+
+            // Update file name on active job from HTTP job info
+            if let activeJob, let fileName = job?.job?.file?.name, activeJob.fileName == nil {
+                activeJob.fileName = fileName
+            }
         }
     }
 
@@ -269,6 +298,115 @@ final class PrinterConnectionManager {
             protocol: printer.printerProtocol
         )
         await refresh()
+    }
+
+    // MARK: - Print Session Tracking
+
+    /// Detect status transitions and manage PrintJob lifecycle
+    private func detectPrintTransition(newStatus: PhotonPrinterService.PhotonStatus) {
+        let old = previousPhotonStatus
+        previousPhotonStatus = newStatus
+
+        guard let printer else { return }
+
+        switch (old, newStatus) {
+        case (nil, .printing), (.idle, .printing), (.stopping, .printing):
+            // Print started
+            startPrintSession(printerName: printer.name, printerIP: printer.ipAddress, protocol: printer.printerProtocol)
+
+        case (.printing, .paused):
+            // Print paused — record elapsed so far
+            recordElapsedTime()
+
+        case (.paused, .printing):
+            // Print resumed — restart the timer
+            printSessionStart = Date()
+
+        case (.printing, .idle), (.printing, .stopping),
+             (.paused, .idle), (.paused, .stopping):
+            // Print finished or was cancelled/stopped
+            completePrintSession(status: (newStatus == .idle) ? .completed : .cancelled)
+
+        default:
+            break
+        }
+    }
+
+    /// Detect HTTP print state transitions
+    private func detectHTTPTransition(newState: String) {
+        let old = previousHTTPState
+        previousHTTPState = newState
+
+        guard let printer else { return }
+
+        if old != "Printing" && newState == "Printing" {
+            startPrintSession(printerName: printer.name, printerIP: printer.ipAddress, protocol: printer.printerProtocol)
+        } else if old == "Printing" && newState != "Printing" && newState != "Paused" && newState != "Pausing" {
+            let finalStatus: PrintStatus = (newState == "Operational") ? .completed : .failed
+            completePrintSession(status: finalStatus)
+        }
+    }
+
+    /// Create a new PrintJob when a print starts
+    private func startPrintSession(printerName: String, printerIP: String, protocol proto: PrinterProtocol) {
+        printSessionStart = Date()
+
+        let job = PrintJob(
+            printerName: printerName,
+            status: .printing,
+            printerIP: printerIP,
+            jobProtocol: proto.rawValue
+        )
+        job.printStartDate = Date()
+
+        // Try to get file name from HTTP job status
+        if let fileName = jobStatus?.job?.file?.name {
+            job.fileName = fileName
+        }
+
+        activeJob = job
+
+        if let modelContext {
+            Task { @MainActor in
+                modelContext.insert(job)
+            }
+        }
+    }
+
+    /// Record accumulated elapsed time (on pause)
+    private func recordElapsedTime() {
+        guard let start = printSessionStart else { return }
+        let elapsed = Date().timeIntervalSince(start)
+
+        if let job = activeJob {
+            Task { @MainActor in
+                job.elapsedTime += elapsed
+            }
+        }
+        printSessionStart = nil
+    }
+
+    /// Finalize the active print session
+    private func completePrintSession(status: PrintStatus) {
+        // Add final elapsed time segment
+        if let start = printSessionStart {
+            let elapsed = Date().timeIntervalSince(start)
+            if let job = activeJob {
+                Task { @MainActor in
+                    job.elapsedTime += elapsed
+                    job.status = status
+                    job.endDate = Date()
+                }
+            }
+        } else if let job = activeJob {
+            Task { @MainActor in
+                job.status = status
+                job.endDate = Date()
+            }
+        }
+
+        printSessionStart = nil
+        activeJob = nil
     }
 
     deinit {
