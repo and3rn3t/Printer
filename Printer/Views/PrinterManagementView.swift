@@ -14,6 +14,7 @@ struct PrinterManagementView: View {
     @Query private var printers: [Printer]
     
     @State private var showingAddPrinter = false
+    @State private var networkMonitor = NetworkMonitor()
     
     var body: some View {
         NavigationStack {
@@ -26,12 +27,33 @@ struct PrinterManagementView: View {
                     )
                 } else {
                     List {
-                        ForEach(printers) { printer in
-                            NavigationLink(destination: PrinterDetailView(printer: printer)) {
-                                PrinterRowView(printer: printer)
+                        // Network status banner
+                        if !networkMonitor.canAccessLocalPrinters {
+                            Section {
+                                Label {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(networkMonitor.statusDescription)
+                                            .font(.subheadline)
+                                            .fontWeight(.medium)
+                                        Text("Connect to WiFi to access local printers")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                } icon: {
+                                    Image(systemName: "wifi.exclamationmark")
+                                        .foregroundStyle(.orange)
+                                }
                             }
                         }
-                        .onDelete(perform: deletePrinters)
+                        
+                        Section {
+                            ForEach(printers) { printer in
+                                NavigationLink(destination: PrinterDetailView(printer: printer)) {
+                                    PrinterRowView(printer: printer)
+                                }
+                            }
+                            .onDelete(perform: deletePrinters)
+                        }
                     }
                 }
             }
@@ -125,9 +147,47 @@ struct AddPrinterView: View {
     @State private var isTestingConnection = false
     @State private var connectionTestResult: Result<Bool, Error>?
     
+    // Discovery
+    @State private var discovery = PrinterDiscovery()
+    @State private var showingDiscovery = false
+    @State private var selectedDiscoveredPrinter: DiscoveredPrinter?
+    
     var body: some View {
         NavigationStack {
             Form {
+                // Auto-discovery section
+                Section {
+                    Button {
+                        showingDiscovery = true
+                    } label: {
+                        Label {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Find Printers on Network")
+                                Text("Auto-discover Anycubic printers")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        } icon: {
+                            Image(systemName: "antenna.radiowaves.left.and.right")
+                                .foregroundStyle(.blue)
+                        }
+                    }
+                    
+                    if let selected = selectedDiscoveredPrinter {
+                        HStack {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundStyle(.green)
+                            VStack(alignment: .leading) {
+                                Text(selected.name)
+                                    .font(.subheadline)
+                                Text("\(selected.ipAddress) via \(selected.discoveryMethod.rawValue)")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
+                
                 Section("Printer Information") {
                     TextField("Name", text: $name)
                     TextField("IP Address", text: $ipAddress)
@@ -193,6 +253,15 @@ struct AddPrinterView: View {
                     .disabled(name.isEmpty || ipAddress.isEmpty)
                 }
             }
+            .sheet(isPresented: $showingDiscovery) {
+                PrinterDiscoveryView(discovery: discovery) { printer in
+                    selectedDiscoveredPrinter = printer
+                    name = printer.name
+                    ipAddress = printer.ipAddress
+                    model = printer.model
+                    showingDiscovery = false
+                }
+            }
         }
     }
     
@@ -227,8 +296,152 @@ struct AddPrinterView: View {
             model: model
         )
         
+        // Populate discovery data if available
+        if let discovered = selectedDiscoveredPrinter {
+            printer.serialNumber = discovered.serialNumber
+            printer.port = discovered.port
+        }
+        
         modelContext.insert(printer)
         dismiss()
+    }
+}
+
+// MARK: - Printer Discovery View
+
+struct PrinterDiscoveryView: View {
+    @Environment(\.dismiss) private var dismiss
+    @Bindable var discovery: PrinterDiscovery
+    let onSelect: (DiscoveredPrinter) -> Void
+    
+    @State private var subnetIP = ""
+    
+    var body: some View {
+        NavigationStack {
+            List {
+                // Scan controls
+                Section {
+                    Button {
+                        discovery.startBonjourDiscovery()
+                    } label: {
+                        Label("Bonjour Scan", systemImage: "bonjour")
+                    }
+                    .disabled(discovery.isScanning)
+                    
+                    HStack {
+                        TextField("Subnet (e.g. 192.168.1.1)", text: $subnetIP)
+                            #if os(iOS)
+                            .keyboardType(.decimalPad)
+                            #endif
+                        
+                        Button {
+                            discovery.scanSubnet(baseIP: subnetIP.isEmpty ? nil : subnetIP)
+                        } label: {
+                            Text("Scan")
+                        }
+                        .disabled(discovery.isScanning)
+                    }
+                    
+                    if discovery.isScanning {
+                        VStack(spacing: 8) {
+                            ProgressView(value: discovery.scanProgress)
+                            Text("Scanning network... \(Int(discovery.scanProgress * 100))%")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                } header: {
+                    Text("Discovery Methods")
+                }
+                
+                // Results
+                Section {
+                    if discovery.discoveredPrinters.isEmpty && !discovery.isScanning {
+                        ContentUnavailableView(
+                            "No Printers Found",
+                            systemImage: "printer.slash",
+                            description: Text("Start a scan to find printers on your network")
+                        )
+                    } else {
+                        ForEach(discovery.discoveredPrinters) { printer in
+                            Button {
+                                onSelect(printer)
+                            } label: {
+                                HStack {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(printer.name)
+                                            .font(.headline)
+                                            .foregroundStyle(.primary)
+                                        
+                                        Text(printer.ipAddress)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                        
+                                        HStack(spacing: 4) {
+                                            Image(systemName: discoveryIcon(for: printer.discoveryMethod))
+                                                .font(.caption2)
+                                            Text(printer.discoveryMethod.rawValue)
+                                                .font(.caption2)
+                                        }
+                                        .foregroundStyle(.secondary)
+                                    }
+                                    
+                                    Spacer()
+                                    
+                                    if !printer.model.isEmpty {
+                                        Text(printer.model)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    
+                                    Image(systemName: "chevron.right")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                    }
+                } header: {
+                    HStack {
+                        Text("Found Printers")
+                        Spacer()
+                        Text("\(discovery.discoveredPrinters.count)")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                
+                if let error = discovery.lastError {
+                    Section {
+                        Label(error, systemImage: "exclamationmark.triangle")
+                            .foregroundStyle(.orange)
+                            .font(.caption)
+                    }
+                }
+            }
+            .navigationTitle("Find Printers")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        discovery.stopDiscovery()
+                        dismiss()
+                    }
+                }
+            }
+            .onDisappear {
+                discovery.stopDiscovery()
+            }
+        }
+    }
+    
+    private func discoveryIcon(for method: DiscoveredPrinter.DiscoveryMethod) -> String {
+        switch method {
+        case .bonjour: return "bonjour"
+        case .anycubicHTTP: return "antenna.radiowaves.left.and.right"
+        case .manual: return "hand.tap"
+        }
     }
 }
 
@@ -237,8 +450,10 @@ struct AddPrinterView: View {
 struct PrinterDetailView: View {
     @Bindable var printer: Printer
     @State private var printerStatus: PrinterStatus?
+    @State private var jobStatus: PrintJobStatus?
     @State private var isLoadingStatus = false
     @State private var statusError: Error?
+    @State private var autoRefreshTask: Task<Void, Never>?
     
     var body: some View {
         Form {
@@ -248,6 +463,12 @@ struct PrinterDetailView: View {
                 LabeledContent("Manufacturer", value: printer.manufacturer)
                 if !printer.model.isEmpty {
                     LabeledContent("Model", value: printer.model)
+                }
+                if let serial = printer.serialNumber {
+                    LabeledContent("Serial", value: serial)
+                }
+                if let firmware = printer.firmwareVersion {
+                    LabeledContent("Firmware", value: firmware)
                 }
             }
             
@@ -259,6 +480,10 @@ struct PrinterDetailView: View {
                     }
                 } else if let status = printerStatus {
                     LabeledContent("State", value: status.state.text)
+                    
+                    if let name = status.printerName {
+                        LabeledContent("Printer", value: name)
+                    }
                     
                     if let temp = status.temperature {
                         if let bed = temp.bed {
@@ -286,6 +511,63 @@ struct PrinterDetailView: View {
                 }
             }
             
+            // Active print job section
+            if let job = jobStatus, job.state != "Operational" {
+                Section("Current Print") {
+                    if let file = job.job?.file?.name {
+                        LabeledContent("File", value: file)
+                    }
+                    
+                    LabeledContent("State", value: job.state)
+                    
+                    if let progress = job.progress {
+                        if let completion = progress.completion {
+                            VStack(alignment: .leading, spacing: 4) {
+                                ProgressView(value: completion / 100.0)
+                                Text("\(Int(completion))% complete")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        
+                        if let timeLeft = progress.printTimeLeft {
+                            LabeledContent("Time Remaining") {
+                                Text(formatDuration(timeLeft))
+                            }
+                        }
+                    }
+                    
+                    // Print controls
+                    HStack(spacing: 16) {
+                        Spacer()
+                        
+                        if job.state == "Printing" {
+                            Button {
+                                pausePrint()
+                            } label: {
+                                Label("Pause", systemImage: "pause.circle.fill")
+                            }
+                        }
+                        
+                        if job.state == "Paused" || job.state == "Pausing" {
+                            Button {
+                                resumePrint()
+                            } label: {
+                                Label("Resume", systemImage: "play.circle.fill")
+                            }
+                        }
+                        
+                        Button(role: .destructive) {
+                            cancelPrint()
+                        } label: {
+                            Label("Cancel", systemImage: "xmark.circle.fill")
+                        }
+                        
+                        Spacer()
+                    }
+                }
+            }
+            
             if let lastConnected = printer.lastConnected {
                 Section {
                     LabeledContent("Last Connected") {
@@ -295,36 +577,105 @@ struct PrinterDetailView: View {
             }
         }
         .navigationTitle(printer.name)
+        .refreshable {
+            await refreshStatus()
+        }
         .onAppear {
             loadStatus()
+            startAutoRefresh()
+        }
+        .onDisappear {
+            autoRefreshTask?.cancel()
         }
     }
+    
+    // MARK: - Status Loading
     
     private func loadStatus() {
         isLoadingStatus = true
         statusError = nil
         
         Task {
-            do {
-                let api = AnycubicPrinterAPI()
-                let status = try await api.getPrinterStatus(
-                    ipAddress: printer.ipAddress,
-                    apiKey: printer.apiKey
-                )
-                
-                await MainActor.run {
-                    printerStatus = status
-                    printer.isConnected = true
-                    printer.lastConnected = Date()
-                    isLoadingStatus = false
-                }
-            } catch {
-                await MainActor.run {
-                    statusError = error
-                    printer.isConnected = false
-                    isLoadingStatus = false
-                }
+            await refreshStatus()
+        }
+    }
+    
+    private func refreshStatus() async {
+        do {
+            let api = AnycubicPrinterAPI()
+            let status = try await api.getPrinterStatus(
+                ipAddress: printer.ipAddress,
+                apiKey: printer.apiKey
+            )
+            
+            // Also try to get job status
+            let job = try? await api.getJobStatus(
+                ipAddress: printer.ipAddress,
+                apiKey: printer.apiKey
+            )
+            
+            await MainActor.run {
+                printerStatus = status
+                jobStatus = job
+                printer.isConnected = true
+                printer.lastConnected = Date()
+                isLoadingStatus = false
+            }
+        } catch {
+            await MainActor.run {
+                statusError = error
+                printer.isConnected = false
+                isLoadingStatus = false
             }
         }
+    }
+    
+    /// Auto-refresh status every 10 seconds while view is visible
+    private func startAutoRefresh() {
+        autoRefreshTask?.cancel()
+        autoRefreshTask = Task {
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(10))
+                if Task.isCancelled { break }
+                await refreshStatus()
+            }
+        }
+    }
+    
+    // MARK: - Print Controls
+    
+    private func pausePrint() {
+        Task {
+            let api = AnycubicPrinterAPI()
+            try? await api.pausePrint(ipAddress: printer.ipAddress, apiKey: printer.apiKey)
+            await refreshStatus()
+        }
+    }
+    
+    private func resumePrint() {
+        Task {
+            let api = AnycubicPrinterAPI()
+            try? await api.resumePrint(ipAddress: printer.ipAddress, apiKey: printer.apiKey)
+            await refreshStatus()
+        }
+    }
+    
+    private func cancelPrint() {
+        Task {
+            let api = AnycubicPrinterAPI()
+            try? await api.cancelPrint(ipAddress: printer.ipAddress, apiKey: printer.apiKey)
+            await refreshStatus()
+        }
+    }
+    
+    // MARK: - Helpers
+    
+    private func formatDuration(_ seconds: Double) -> String {
+        let hours = Int(seconds) / 3600
+        let minutes = (Int(seconds) % 3600) / 60
+        if hours > 0 {
+            return "\(hours)h \(minutes)m"
+        }
+        return "\(minutes)m"
     }
 }

@@ -20,6 +20,16 @@ struct PrintJobView: View {
     @State private var isUploading = false
     @State private var uploadError: String?
     @State private var startPrintAfterUpload = true
+    @State private var uploadPhase: UploadPhase = .idle
+    
+    enum UploadPhase: Equatable {
+        case idle
+        case preparing
+        case uploading
+        case startingPrint
+        case complete
+        case failed(String)
+    }
     
     var body: some View {
         NavigationStack {
@@ -58,20 +68,40 @@ struct PrintJobView: View {
                 }
                 
                 if isUploading {
-                    Section {
+                    Section("Upload Progress") {
                         VStack(spacing: 12) {
                             ProgressView(value: uploadProgress)
-                            Text("\(Int(uploadProgress * 100))% uploaded")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .animation(.easeInOut(duration: 0.3), value: uploadProgress)
+                            
+                            HStack {
+                                phaseIcon
+                                Text(phaseDescription)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                Spacer()
+                                Text("\(Int(uploadProgress * 100))%")
+                                    .font(.caption)
+                                    .fontWeight(.medium)
+                                    .monospacedDigit()
+                            }
                         }
                     }
                 }
                 
                 if let error = uploadError {
                     Section {
-                        Text(error)
-                            .foregroundStyle(.red)
+                        Label {
+                            Text(error)
+                                .font(.caption)
+                        } icon: {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundStyle(.red)
+                        }
+                        
+                        Button("Retry") {
+                            sendToPrinter()
+                        }
+                        .disabled(selectedPrinter == nil)
                     }
                 }
             }
@@ -97,11 +127,52 @@ struct PrintJobView: View {
         }
     }
     
+    // MARK: - Phase Display
+    
+    private var phaseIcon: some View {
+        Group {
+            switch uploadPhase {
+            case .idle:
+                EmptyView()
+            case .preparing:
+                ProgressView()
+                    .controlSize(.small)
+            case .uploading:
+                Image(systemName: "arrow.up.circle")
+                    .foregroundStyle(.blue)
+            case .startingPrint:
+                ProgressView()
+                    .controlSize(.small)
+            case .complete:
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(.green)
+            case .failed:
+                Image(systemName: "xmark.circle.fill")
+                    .foregroundStyle(.red)
+            }
+        }
+    }
+    
+    private var phaseDescription: String {
+        switch uploadPhase {
+        case .idle: return ""
+        case .preparing: return "Preparing file..."
+        case .uploading: return "Uploading to printer..."
+        case .startingPrint: return "Starting print job..."
+        case .complete: return "Complete!"
+        case .failed(let msg): return msg
+        }
+    }
+    
+    // MARK: - Upload
+    
     private func sendToPrinter() {
         guard let printer = selectedPrinter else { return }
         
         isUploading = true
         uploadError = nil
+        uploadProgress = 0
+        uploadPhase = .preparing
         
         Task {
             do {
@@ -114,8 +185,12 @@ struct PrintJobView: View {
                 // Read file
                 let fileURL = URL(fileURLWithPath: model.fileURL)
                 
-                // Upload to printer
+                // Upload to printer with real progress tracking
                 let api = AnycubicPrinterAPI()
+                
+                await MainActor.run {
+                    uploadPhase = .uploading
+                }
                 
                 try await api.uploadFile(
                     ipAddress: printer.ipAddress,
@@ -130,6 +205,10 @@ struct PrintJobView: View {
                 
                 // Start printing if requested
                 if startPrintAfterUpload {
+                    await MainActor.run {
+                        uploadPhase = .startingPrint
+                    }
+                    
                     job.status = .printing
                     try await api.startPrint(
                         ipAddress: printer.ipAddress,
@@ -140,14 +219,25 @@ struct PrintJobView: View {
                     job.status = .queued
                 }
                 
+                // Update printer connection status
+                printer.isConnected = true
+                printer.lastConnected = Date()
+                
                 await MainActor.run {
+                    uploadPhase = .complete
                     isUploading = false
-                    dismiss()
+                    
+                    // Dismiss after brief delay to show completion
+                    Task {
+                        try? await Task.sleep(for: .seconds(1))
+                        dismiss()
+                    }
                 }
                 
             } catch {
                 await MainActor.run {
                     isUploading = false
+                    uploadPhase = .failed(error.localizedDescription)
                     uploadError = error.localizedDescription
                 }
             }

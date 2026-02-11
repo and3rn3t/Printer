@@ -104,12 +104,28 @@ final class Printer {
     var lastConnected: Date?
     var isConnected: Bool
     
+    /// Serial number / CN from Anycubic discovery
+    var serialNumber: String?
+    
+    /// Port used for connection (default 80 for OctoPrint, 18910 for Anycubic native)
+    var port: Int
+    
+    /// Device ID for MQTT communication
+    var deviceId: String?
+    
+    /// Mode ID for MQTT communication
+    var modeId: String?
+    
+    /// Firmware version reported by printer
+    var firmwareVersion: String?
+    
     init(
         name: String,
         ipAddress: String,
         apiKey: String? = nil,
         manufacturer: String = "Anycubic",
-        model: String = ""
+        model: String = "",
+        port: Int = 80
     ) {
         self.id = UUID()
         self.name = name
@@ -117,6 +133,7 @@ final class Printer {
         self.apiKey = apiKey
         self.manufacturer = manufacturer
         self.model = model
+        self.port = port
         self.isConnected = false
     }
 }
