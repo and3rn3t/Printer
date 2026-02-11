@@ -8,6 +8,7 @@
 import Foundation
 import ModelIO
 import SceneKit
+import SceneKit.ModelIO
 
 /// Converts between different 3D model formats
 actor ModelConverter {
@@ -87,17 +88,10 @@ actor ModelConverter {
                 }
                 scene = loadedScene
             } else if modelURL.pathExtension.lowercased() == "stl" {
-                // Load STL using ModelIO
+                // Load STL using ModelIO and convert to SceneKit scene
                 let asset = MDLAsset(url: modelURL)
-                
-                // Create an empty scene and manually add the MDLAsset objects
-                scene = SCNScene()
-                
-                for index in 0..<asset.count {
-                    guard let object = asset.object(at: index) as? MDLMesh else { continue }
-                    let node = SCNNode(mdlObject: object)
-                    scene.rootNode.addChildNode(node)
-                }
+                asset.loadTextures()
+                scene = SCNScene(mdlAsset: asset)
             } else {
                 continuation.resume(returning: nil)
                 return
