@@ -154,21 +154,18 @@ actor PrintablesService {
             stls {
               id
               name
-              filePath
               fileSize
               filePreviewPath
             }
             gcodes {
               id
               name
-              filePath
               fileSize
               filePreviewPath
             }
             slas {
               id
               name
-              filePath
               fileSize
               filePreviewPath
             }
@@ -212,22 +209,56 @@ actor PrintablesService {
 
     /// Download a file from Printables to a local temporary directory.
     ///
-    /// - Parameter file: The `PrintablesFile` (STL, GCode, or SLA) to download
+    /// Uses the `getDownloadLink` mutation to obtain a signed URL, then downloads the file.
+    ///
+    /// - Parameters:
+    ///   - file: The `PrintablesFile` (STL, GCode, or SLA) to download
+    ///   - printId: The Printables model ID that owns this file
+    ///   - fileType: The type of file ("stl", "gcode", or "sla")
     /// - Returns: Local URL of the downloaded file
-    func downloadFile(_ file: PrintablesFile) async throws -> URL {
-        guard let downloadURL = file.downloadURL else {
-            throw PrintablesError.invalidURL
+    func downloadFile(_ file: PrintablesFile, printId: String, fileType: String) async throws -> URL {
+        // Step 1: Get signed download URL via mutation
+        let mutation = """
+        mutation GetDownloadLink($printId: ID!, $fileType: DownloadFileTypeEnum, $source: DownloadSourceEnum!, $id: ID) {
+          getDownloadLink(printId: $printId, fileType: $fileType, source: $source, id: $id) {
+            ok
+            output {
+              link
+            }
+          }
+        }
+        """
+
+        let variables: [String: GraphQLValue] = [
+            "printId": .string(printId),
+            "fileType": .string(fileType),
+            "source": .string("model_detail"),
+            "id": .string(file.id)
+        ]
+
+        let gqlRequest = GraphQLRequest(
+            operationName: "GetDownloadLink",
+            query: mutation,
+            variables: variables
+        )
+
+        let response: GraphQLResponse<GetDownloadLinkData> = try await execute(gqlRequest)
+
+        guard let link = response.data?.getDownloadLink.output?.link,
+              let downloadURL = URL(string: link) else {
+            throw PrintablesError.downloadFailed("Could not obtain download link")
         }
 
+        // Step 2: Download file from the signed URL
         var request = URLRequest(url: downloadURL)
         request.httpMethod = "GET"
 
-        let (data, response) = try await session.data(for: request)
+        let (data, httpResponse) = try await session.data(for: request)
 
-        guard let httpResponse = response as? HTTPURLResponse,
-              (200...299).contains(httpResponse.statusCode) else {
+        guard let http = httpResponse as? HTTPURLResponse,
+              (200...299).contains(http.statusCode) else {
             throw PrintablesError.downloadFailed(
-                "HTTP \((response as? HTTPURLResponse)?.statusCode ?? 0)"
+                "HTTP \((httpResponse as? HTTPURLResponse)?.statusCode ?? 0)"
             )
         }
 

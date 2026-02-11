@@ -63,6 +63,20 @@ struct PrintDetailData: Decodable {
     let print: PrintablesModelDetail
 }
 
+/// Response type for the `getDownloadLink` mutation
+struct GetDownloadLinkData: Decodable {
+    let getDownloadLink: GetDownloadLinkResult
+}
+
+struct GetDownloadLinkResult: Decodable {
+    let ok: Bool
+    let output: GetDownloadLinkOutput?
+}
+
+struct GetDownloadLinkOutput: Decodable {
+    let link: String
+}
+
 // MARK: - Printables Data Types
 
 /// A search result from `searchPrints2` — lightweight summary
@@ -76,6 +90,21 @@ struct PrintablesSearchResult: Decodable, Identifiable, Sendable {
     let likesCount: Int
     let downloadCount: Int
     let datePublished: String
+
+    /// Human-readable date (e.g. "Feb 14, 2025")
+    var formattedDate: String {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = formatter.date(from: datePublished) {
+            return date.formatted(date: .abbreviated, time: .omitted)
+        }
+        // Try without fractional seconds
+        formatter.formatOptions = [.withInternetDateTime]
+        if let date = formatter.date(from: datePublished) {
+            return date.formatted(date: .abbreviated, time: .omitted)
+        }
+        return datePublished
+    }
 }
 
 /// Full model detail from `print(id:)` — includes files, description, author
@@ -109,7 +138,8 @@ struct PrintablesImage: Decodable, Identifiable, Sendable {
 
     /// Full URL for loading the media asset
     var imageURL: URL? {
-        URL(string: "https://media.printables.com\(filePath)")
+        let path = filePath.hasPrefix("/") ? filePath : "/\(filePath)"
+        return URL(string: "https://media.printables.com\(path)")
     }
 }
 
@@ -122,7 +152,8 @@ struct PrintablesUser: Decodable, Sendable {
 
     /// Full URL for the user's avatar
     var avatarURL: URL? {
-        URL(string: "https://media.printables.com\(avatarFilePath)")
+        let path = avatarFilePath.hasPrefix("/") ? avatarFilePath : "/\(avatarFilePath)"
+        return URL(string: "https://media.printables.com\(path)")
     }
 }
 
@@ -136,14 +167,8 @@ struct PrintablesTag: Decodable, Identifiable, Sendable {
 struct PrintablesFile: Decodable, Identifiable, Sendable {
     let id: String
     let name: String
-    let filePath: String
     let fileSize: Int
     let filePreviewPath: String
-
-    /// Full download URL for the file
-    var downloadURL: URL? {
-        URL(string: "https://media.printables.com\(filePath)")
-    }
 
     /// Human-readable file size
     var formattedFileSize: String {

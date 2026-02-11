@@ -200,7 +200,7 @@ struct PrintablesDetailView: View {
             if let stls = model.stls, !stls.isEmpty {
                 Section("STL Files") {
                     ForEach(stls) { file in
-                        fileRow(file: file, icon: "doc.zipper", modelName: model.name)
+                        fileRow(file: file, icon: "doc.zipper", modelName: model.name, printId: model.id, fileType: "stl")
                     }
                 }
             }
@@ -209,7 +209,7 @@ struct PrintablesDetailView: View {
             if let slas = model.slas, !slas.isEmpty {
                 Section("SLA Files") {
                     ForEach(slas) { file in
-                        fileRow(file: file, icon: "cube.fill", modelName: model.name)
+                        fileRow(file: file, icon: "cube.fill", modelName: model.name, printId: model.id, fileType: "sla")
                     }
                 }
             }
@@ -218,7 +218,7 @@ struct PrintablesDetailView: View {
             if let gcodes = model.gcodes, !gcodes.isEmpty {
                 Section("GCode Files") {
                     ForEach(gcodes) { file in
-                        fileRow(file: file, icon: "printer.fill", modelName: model.name)
+                        fileRow(file: file, icon: "printer.fill", modelName: model.name, printId: model.id, fileType: "gcode")
                     }
                 }
             }
@@ -250,7 +250,7 @@ struct PrintablesDetailView: View {
     }
 
     @ViewBuilder
-    private func fileRow(file: PrintablesFile, icon: String, modelName: String) -> some View {
+    private func fileRow(file: PrintablesFile, icon: String, modelName: String, printId: String, fileType: String) -> some View {
         HStack {
             Image(systemName: icon)
                 .foregroundStyle(.blue)
@@ -271,7 +271,7 @@ struct PrintablesDetailView: View {
                     .controlSize(.small)
             } else {
                 Button {
-                    downloadAndImport(file: file, modelName: modelName)
+                    downloadAndImport(file: file, modelName: modelName, printId: printId, fileType: fileType)
                 } label: {
                     Image(systemName: "arrow.down.to.line")
                         .font(.body)
@@ -310,21 +310,29 @@ struct PrintablesDetailView: View {
         }
     }
 
-    private func downloadAndImport(file: PrintablesFile, modelName: String) {
+    private func downloadAndImport(file: PrintablesFile, modelName: String, printId: String, fileType: String) {
         downloadingFileID = file.id
 
         Task {
             do {
-                // Download the file
-                let localURL = try await service.downloadFile(file)
+                // Download the file via signed link
+                let localURL = try await service.downloadFile(file, printId: printId, fileType: fileType)
 
                 // Import into the local model library
                 let (savedURL, fileSize) = try await STLFileManager.shared.importSTL(from: localURL)
                 let relativePath = await STLFileManager.shared.relativePath(for: savedURL)
 
-                // Generate thumbnail
-                let converter = ModelConverter()
-                let thumbnailData = try? await converter.generateThumbnail(from: savedURL)
+                // Use the Printables model image as thumbnail (more reliable than SceneKit rendering)
+                var thumbnailData: Data?
+                if let imageURL = detail?.images?.first?.imageURL {
+                    thumbnailData = try? await URLSession.shared.data(from: imageURL).0
+                }
+
+                // Fall back to SceneKit rendering if no image available
+                if thumbnailData == nil {
+                    let converter = ModelConverter()
+                    thumbnailData = try? await converter.generateThumbnail(from: savedURL)
+                }
 
                 await MainActor.run {
                     let printModel = PrintModel(

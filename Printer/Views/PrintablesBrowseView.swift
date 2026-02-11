@@ -289,7 +289,7 @@ struct PrintablesResultRow: View {
                 }
                 .font(.caption)
 
-                Text(result.datePublished)
+                Text(result.formattedDate)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }

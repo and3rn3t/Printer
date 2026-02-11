@@ -881,7 +881,6 @@ struct PrintablesModelTests {
                 {
                     "id": "s1",
                     "name": "vase.stl",
-                    "filePath": "/media/prints/99/stls/vase.stl",
                     "fileSize": 512000,
                     "filePreviewPath": "/media/prints/99/stls/preview.png"
                 }
@@ -925,21 +924,20 @@ struct PrintablesModelTests {
         #expect(detail.license?.disallowRemixing == false)
     }
 
-    @Test func printablesFileURLs() throws {
+    @Test func printablesFileProperties() throws {
         let json = """
         {
             "id": "f1",
             "name": "part.stl",
-            "filePath": "/media/prints/100/stls/part.stl",
             "fileSize": 1048576,
             "filePreviewPath": "/media/prints/100/stls/preview.png"
         }
         """.data(using: .utf8)!
 
         let file = try JSONDecoder().decode(PrintablesFile.self, from: json)
-        #expect(file.downloadURL?.absoluteString == "https://media.printables.com/media/prints/100/stls/part.stl")
         #expect(file.formattedFileSize == "1 MB")
         #expect(file.fileExtension == "stl")
+        #expect(file.name == "part.stl")
     }
 
     @Test func printablesUserAvatarURL() throws {
