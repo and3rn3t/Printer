@@ -19,6 +19,8 @@ struct ContentView: View {
     @State private var showingImporter = false
     @State private var showingPrinterSetup = false
     @State private var columnVisibility = NavigationSplitViewVisibility.all
+    @State private var errorMessage: String?
+    @State private var showingError = false
 
     var body: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
@@ -111,6 +113,11 @@ struct ContentView: View {
         .sheet(isPresented: $showingPrinterSetup) {
             PrinterManagementView()
         }
+        .alert("Error", isPresented: $showingError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(errorMessage ?? "An unknown error occurred.")
+        }
     }
     
     private func deleteModels(offsets: IndexSet) {
@@ -163,7 +170,10 @@ struct ContentView: View {
                 selectedModel = model
             }
         } catch {
-            print("Error handling scanned model: \(error)")
+            await MainActor.run {
+                errorMessage = "Failed to process scanned model: \(error.localizedDescription)"
+                showingError = true
+            }
         }
     }
     
@@ -215,7 +225,10 @@ struct ContentView: View {
                 }
             }
         } catch {
-            print("Error importing files: \(error)")
+            await MainActor.run {
+                errorMessage = "Failed to import file: \(error.localizedDescription)"
+                showingError = true
+            }
         }
     }
 }

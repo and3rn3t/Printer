@@ -454,6 +454,8 @@ struct PrinterDetailView: View {
     @State private var isLoadingStatus = false
     @State private var statusError: Error?
     @State private var autoRefreshTask: Task<Void, Never>?
+    @State private var controlError: String?
+    @State private var showingControlError = false
     
     var body: some View {
         Form {
@@ -587,6 +589,11 @@ struct PrinterDetailView: View {
         .onDisappear {
             autoRefreshTask?.cancel()
         }
+        .alert("Printer Error", isPresented: $showingControlError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(controlError ?? "An unknown error occurred.")
+        }
     }
     
     // MARK: - Status Loading
@@ -646,25 +653,46 @@ struct PrinterDetailView: View {
     
     private func pausePrint() {
         Task {
-            let api = AnycubicPrinterAPI()
-            try? await api.pausePrint(ipAddress: printer.ipAddress, apiKey: printer.apiKey)
-            await refreshStatus()
+            do {
+                let api = AnycubicPrinterAPI()
+                try await api.pausePrint(ipAddress: printer.ipAddress, apiKey: printer.apiKey)
+                await refreshStatus()
+            } catch {
+                await MainActor.run {
+                    controlError = "Failed to pause print: \(error.localizedDescription)"
+                    showingControlError = true
+                }
+            }
         }
     }
     
     private func resumePrint() {
         Task {
-            let api = AnycubicPrinterAPI()
-            try? await api.resumePrint(ipAddress: printer.ipAddress, apiKey: printer.apiKey)
-            await refreshStatus()
+            do {
+                let api = AnycubicPrinterAPI()
+                try await api.resumePrint(ipAddress: printer.ipAddress, apiKey: printer.apiKey)
+                await refreshStatus()
+            } catch {
+                await MainActor.run {
+                    controlError = "Failed to resume print: \(error.localizedDescription)"
+                    showingControlError = true
+                }
+            }
         }
     }
     
     private func cancelPrint() {
         Task {
-            let api = AnycubicPrinterAPI()
-            try? await api.cancelPrint(ipAddress: printer.ipAddress, apiKey: printer.apiKey)
-            await refreshStatus()
+            do {
+                let api = AnycubicPrinterAPI()
+                try await api.cancelPrint(ipAddress: printer.ipAddress, apiKey: printer.apiKey)
+                await refreshStatus()
+            } catch {
+                await MainActor.run {
+                    controlError = "Failed to cancel print: \(error.localizedDescription)"
+                    showingControlError = true
+                }
+            }
         }
     }
     
