@@ -183,7 +183,7 @@ struct PrintJobView: View {
                 modelContext.insert(job)
                 
                 // Read file
-                let fileURL = URL(fileURLWithPath: model.fileURL)
+                let fileURL = model.resolvedFileURL
                 
                 // Upload to printer with real progress tracking
                 let api = AnycubicPrinterAPI()

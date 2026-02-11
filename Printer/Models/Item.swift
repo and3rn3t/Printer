@@ -16,8 +16,18 @@ final class PrintModel {
     var createdDate: Date
     var modifiedDate: Date
     
-    /// Path to the STL file in documents directory
+    /// Relative path to the STL file within the documents directory
+    /// Stored as a relative path (e.g. "STLFiles/model.stl") so it survives container changes
     var fileURL: String
+    
+    /// Resolves the stored relative path to an absolute URL
+    var resolvedFileURL: URL {
+        let documentsDirectory = FileManager.default.urls(
+            for: .documentDirectory,
+            in: .userDomainMask
+        ).first!
+        return documentsDirectory.appendingPathComponent(fileURL)
+    }
     
     /// Size in bytes
     var fileSize: Int64
@@ -25,8 +35,8 @@ final class PrintModel {
     /// Source of the model
     var source: ModelSource
     
-    /// Thumbnail image data (optional)
-    var thumbnailData: Data?
+    /// Thumbnail image data (optional, stored externally for performance)
+    @Attribute(.externalStorage) var thumbnailData: Data?
     
     /// Notes about the model
     var notes: String

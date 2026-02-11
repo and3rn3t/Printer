@@ -96,6 +96,27 @@ actor STLFileManager {
         return uniqueURL
     }
     
+    /// Convert an absolute file URL to a relative path (relative to Documents directory)
+    /// for stable storage in SwiftData
+    func relativePath(for url: URL) -> String {
+        let documentsDirectory = try? fileManager.url(
+            for: .documentDirectory,
+            in: .userDomainMask,
+            appropriateFor: nil,
+            create: false
+        )
+        guard let documentsPath = documentsDirectory?.path else {
+            return url.lastPathComponent
+        }
+        let fullPath = url.path
+        if fullPath.hasPrefix(documentsPath) {
+            // Strip the documents directory prefix and leading slash
+            let relative = String(fullPath.dropFirst(documentsPath.count))
+            return relative.hasPrefix("/") ? String(relative.dropFirst()) : relative
+        }
+        return url.lastPathComponent
+    }
+    
     /// Validate STL file format (basic check)
     func validateSTL(data: Data) -> Bool {
         // Check if binary STL (starts with 80 bytes header, then 4 bytes for triangle count)

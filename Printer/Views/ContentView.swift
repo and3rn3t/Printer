@@ -120,7 +120,7 @@ struct ContentView: View {
                 
                 // Delete the file
                 Task {
-                    try? await STLFileManager.shared.deleteSTL(at: model.fileURL)
+                    try? await STLFileManager.shared.deleteSTL(at: model.resolvedFileURL.path)
                 }
                 
                 modelContext.delete(model)
@@ -146,11 +146,14 @@ struct ContentView: View {
             // Generate thumbnail
             let thumbnailData = try? await converter.generateThumbnail(from: fileURL)
             
+            // Store as relative path for container resilience
+            let relativePath = await STLFileManager.shared.relativePath(for: fileURL)
+            
             // Create model entry
             await MainActor.run {
                 let model = PrintModel(
                     name: "Scanned Object \(Date().formatted(date: .numeric, time: .shortened))",
-                    fileURL: fileURL.path,
+                    fileURL: relativePath,
                     fileSize: fileSize,
                     source: .scanned,
                     thumbnailData: thumbnailData
@@ -194,11 +197,14 @@ struct ContentView: View {
                 // Generate thumbnail
                 let thumbnailData = try? await converter.generateThumbnail(from: fileURL)
                 
+                // Store as relative path for container resilience
+                let relativePath = await STLFileManager.shared.relativePath(for: fileURL)
+                
                 // Create model entry
                 await MainActor.run {
                     let model = PrintModel(
                         name: url.deletingPathExtension().lastPathComponent,
-                        fileURL: fileURL.path,
+                        fileURL: relativePath,
                         fileSize: fileSize,
                         source: .imported,
                         thumbnailData: thumbnailData
