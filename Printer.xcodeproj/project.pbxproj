@@ -29,9 +29,22 @@
 		3DB923FD2F3C2A2600FFF04E /* PrinterUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PrinterUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		3DB924112F3C2A2600FFF04E /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Resources/Info.plist,
+			);
+			target = 3DB923E12F3C2A2600FFF04E /* Printer */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		3DB923E42F3C2A2600FFF04E /* Printer */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				3DB924112F3C2A2600FFF04E /* PBXFileSystemSynchronizedBuildFileExceptionSet */,
+			);
 			path = Printer;
 			sourceTree = "<group>";
 		};
