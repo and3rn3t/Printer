@@ -1,0 +1,62 @@
+{
+    // Swift language settings
+    "editor.defaultFormatter": "swiftlang.swift-vscode",
+    "[swift]": {
+        "editor.tabSize": 4,
+        "editor.insertSpaces": true,
+        "editor.formatOnSave": true,
+        "editor.rulers": [120],
+        "editor.suggest.snippetsPreventQuickSuggestions": false,
+        "editor.bracketPairColorization.enabled": true,
+        "editor.guides.bracketPairs": "active"
+    },
+
+    // File associations
+    "files.associations": {
+        "*.swift": "swift",
+        "*.plist": "xml",
+        "*.entitlements": "xml",
+        "*.pbxproj": "plaintext",
+        "*.storyboard": "xml",
+        "*.xib": "xml",
+        "*.xcscheme": "xml"
+    },
+
+    // Exclude build artifacts and Xcode noise from explorer/search
+    "files.exclude": {
+        "**/.DS_Store": true,
+        "**/DerivedData": true,
+        "**/*.xcodeproj/xcuserdata": true,
+        "**/*.xcworkspace/xcuserdata": true,
+        "**/.build": true
+    },
+    "search.exclude": {
+        "**/DerivedData": true,
+        "**/*.xcodeproj/project.pbxproj": true,
+        "**/.build": true
+    },
+
+    // Swift sourcekit-lsp (provided by the Swift extension)
+    "swift.sourcekit-lsp.serverArguments": [],
+
+    // Trim trailing whitespace
+    "files.trimTrailingWhitespace": true,
+    "files.insertFinalNewline": true,
+
+    // Editor enhancements for Swift
+    "editor.minimap.enabled": false,
+    "editor.stickyScroll.enabled": true,
+    "editor.inlayHints.enabled": "onUnlessPressed",
+    "editor.wordWrap": "off",
+
+    // Terminal profile for builds
+    "terminal.integrated.defaultProfile.osx": "zsh",
+
+    // File nesting (group related files in explorer)
+    "explorer.fileNesting.enabled": true,
+    "explorer.fileNesting.patterns": {
+        "*.swift": "${capture}.generated.swift",
+        "*.xcodeproj": "*.xcworkspace, buildServer.json",
+        "Info.plist": "*.entitlements, *.plist"
+    }
+}
