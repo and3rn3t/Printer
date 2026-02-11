@@ -20,6 +20,8 @@ struct ContentView: View {
     @State private var showingPrinterSetup = false
     @State private var showingPrintHistory = false
     @State private var showingPrintables = false
+    @State private var showingSettings = false
+    @State private var showingPrintQueue = false
     @State private var columnVisibility = NavigationSplitViewVisibility.all
     @State private var errorMessage: String?
     @State private var showingError = false
@@ -34,6 +36,8 @@ struct ContentView: View {
                 showingPrintables: $showingPrintables,
                 showingPrintHistory: $showingPrintHistory,
                 showingPrinterSetup: $showingPrinterSetup,
+                showingSettings: $showingSettings,
+                showingPrintQueue: $showingPrintQueue,
                 onDelete: deleteModels
             )
         } detail: {
@@ -123,6 +127,12 @@ struct ContentView: View {
                         }
                     }
             }
+        }
+        .sheet(isPresented: $showingSettings) {
+            SettingsView()
+        }
+        .sheet(isPresented: $showingPrintQueue) {
+            PrintQueueView()
         }
         .alert("Error", isPresented: $showingError) {
             Button("OK", role: .cancel) { }
@@ -254,7 +264,56 @@ struct ModelListView: View {
     @Binding var showingPrintables: Bool
     @Binding var showingPrintHistory: Bool
     @Binding var showingPrinterSetup: Bool
+    @Binding var showingSettings: Bool
+    @Binding var showingPrintQueue: Bool
     let onDelete: (IndexSet) -> Void
+
+    @AppStorage("defaultSortOption") private var sortOptionRaw = "Date (Newest)"
+    @State private var searchText = ""
+    @State private var filterOption: ModelFilterOption = .all
+
+    private var sortOption: ModelSortOption {
+        ModelSortOption(rawValue: sortOptionRaw) ?? .dateNewest
+    }
+
+    /// Models filtered and sorted by current user selections
+    private var filteredModels: [PrintModel] {
+        var result = models
+
+        // Filter
+        switch filterOption {
+        case .all: break
+        case .scanned: result = result.filter { $0.source == .scanned }
+        case .imported: result = result.filter { $0.source == .imported }
+        case .downloaded: result = result.filter { $0.source == .downloaded }
+        case .favorites: result = result.filter { $0.isFavorite }
+        case .needsSlicing: result = result.filter { $0.requiresSlicing }
+        case .sliced: result = result.filter { !$0.requiresSlicing }
+        }
+
+        // Search
+        if !searchText.isEmpty {
+            let query = searchText.lowercased()
+            result = result.filter {
+                $0.name.lowercased().contains(query) ||
+                $0.notes.lowercased().contains(query) ||
+                $0.tags.contains(where: { $0.lowercased().contains(query) })
+            }
+        }
+
+        // Sort
+        switch sortOption {
+        case .dateNewest: result.sort { $0.modifiedDate > $1.modifiedDate }
+        case .dateOldest: result.sort { $0.modifiedDate < $1.modifiedDate }
+        case .nameAZ: result.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        case .nameZA: result.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedDescending }
+        case .sizeLargest: result.sort { $0.fileSize > $1.fileSize }
+        case .sizeSmallest: result.sort { $0.fileSize < $1.fileSize }
+        case .printCount: result.sort { $0.printJobs.count > $1.printJobs.count }
+        }
+
+        return result
+    }
     
     var body: some View {
         Group {
@@ -313,13 +372,54 @@ struct ModelListView: View {
 #endif
             } else {
                 List(selection: $selectedModel) {
-                    ForEach(models) { model in
+                    // Filter chips
+                    if !searchText.isEmpty || filterOption != .all {
+                        HStack {
+                            Text("\(filteredModels.count) of \(models.count) models")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            if filterOption != .all {
+                                Button {
+                                    filterOption = .all
+                                } label: {
+                                    Label("Clear Filter", systemImage: "xmark.circle.fill")
+                                        .font(.caption)
+                                }
+                                .buttonStyle(.plain)
+                                .foregroundStyle(.secondary)
+                            }
+                        }
+                        .listRowSeparator(.hidden)
+                    }
+
+                    ForEach(filteredModels) { model in
                         NavigationLink(value: model) {
                             ModelRowView(model: model)
                         }
+                        .swipeActions(edge: .leading) {
+                            Button {
+                                model.isFavorite.toggle()
+                            } label: {
+                                Label(
+                                    model.isFavorite ? "Unfavorite" : "Favorite",
+                                    systemImage: model.isFavorite ? "star.slash" : "star.fill"
+                                )
+                            }
+                            .tint(.yellow)
+                        }
+                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                            Button(role: .destructive) {
+                                if let idx = models.firstIndex(of: model) {
+                                    onDelete(IndexSet(integer: idx))
+                                }
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                        }
                     }
-                    .onDelete(perform: onDelete)
                 }
+                .searchable(text: $searchText, prompt: "Search models")
             }
         }
         .navigationTitle("3D Models")
@@ -359,6 +459,52 @@ struct ModelListView: View {
             }
 
             ToolbarItem(placement: .primaryAction) {
+                Menu {
+                    // Sort options
+                    Section("Sort By") {
+                        ForEach(ModelSortOption.allCases) { option in
+                            Button {
+                                sortOptionRaw = option.rawValue
+                            } label: {
+                                HStack {
+                                    Text(option.rawValue)
+                                    if sortOption == option {
+                                        Image(systemName: "checkmark")
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Filter options
+                    Section("Filter") {
+                        ForEach(ModelFilterOption.allCases) { option in
+                            Button {
+                                filterOption = option
+                            } label: {
+                                HStack {
+                                    Text(option.rawValue)
+                                    if filterOption == option {
+                                        Image(systemName: "checkmark")
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } label: {
+                    Label("Sort & Filter", systemImage: "line.3.horizontal.decrease.circle")
+                }
+            }
+
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    showingPrintQueue = true
+                } label: {
+                    Label("Print Queue", systemImage: "list.number")
+                }
+            }
+
+            ToolbarItem(placement: .primaryAction) {
                 Button {
                     showingPrintHistory = true
                 } label: {
@@ -371,6 +517,14 @@ struct ModelListView: View {
                     showingPrinterSetup = true
                 } label: {
                     Label("Printers", systemImage: "printer")
+                }
+            }
+
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    showingSettings = true
+                } label: {
+                    Label("Settings", systemImage: "gear")
                 }
             }
         }
@@ -417,6 +571,16 @@ struct ModelRowView: View {
             .frame(width: 60, height: 60)
             .clipShape(RoundedRectangle(cornerRadius: 12))
             .shadow(color: .black.opacity(0.1), radius: 4, y: 2)
+            .overlay(alignment: .topTrailing) {
+                if model.isFavorite {
+                    Image(systemName: "star.fill")
+                        .font(.caption2)
+                        .foregroundStyle(.yellow)
+                        .padding(2)
+                        .background(.ultraThinMaterial, in: Circle())
+                        .offset(x: 4, y: -4)
+                }
+            }
             
             VStack(alignment: .leading, spacing: 6) {
                 Text(model.name)
@@ -439,6 +603,16 @@ struct ModelRowView: View {
                     Text(ByteCountFormatter.string(fromByteCount: model.fileSize, countStyle: .file))
                         .font(.caption)
                         .foregroundStyle(.secondary)
+
+                    // File type badge
+                    Text(model.fileType.displayName)
+                        .font(.caption2)
+                        .fontWeight(.medium)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 1)
+                        .background(model.requiresSlicing ? Color.orange.opacity(0.15) : Color.green.opacity(0.15))
+                        .foregroundStyle(model.requiresSlicing ? .orange : .green)
+                        .clipShape(Capsule())
                 }
                 
                 if !model.printJobs.isEmpty {

@@ -7,6 +7,7 @@
 
 import Foundation
 import SwiftData
+import ActivityKit
 
 /// Manages live connection state and periodic status polling for a printer.
 ///
@@ -198,6 +199,20 @@ final class PrinterConnectionManager {
             // Detect print state transitions
             self.detectPrintTransition(newStatus: status)
 
+            // Update Live Activity with current progress (ACT printers have limited progress info)
+            #if os(iOS)
+            if status == .printing {
+                let elapsed = Int(self.activeJob?.effectiveDuration ?? 0)
+                Task { @MainActor in
+                    await PrintActivityManager.shared.updateActivity(
+                        progress: 0.0,  // ACT protocol doesn't report progress %
+                        status: "Printing",
+                        elapsedSeconds: elapsed
+                    )
+                }
+            }
+            #endif
+
             // Update printer model with firmware if we have sysinfo
             if let sysInfo = self.systemInfo {
                 printer.firmwareVersion = sysInfo.firmwareVersion
@@ -233,6 +248,24 @@ final class PrinterConnectionManager {
             if let activeJob, let fileName = job?.job?.file?.name, activeJob.fileName == nil {
                 activeJob.fileName = fileName
             }
+
+            // Update Live Activity for HTTP printers
+            #if os(iOS)
+            if status.state.flags.printing, let jobInfo = job {
+                let elapsed = Int(self.activeJob?.effectiveDuration ?? 0)
+                let completionPct = jobInfo.progress?.completion ?? 0
+                let progress = min(completionPct / 100.0, 1.0)
+                let remaining = jobInfo.progress?.printTimeLeft.flatMap { Int($0) }
+                Task { @MainActor in
+                    await PrintActivityManager.shared.updateActivity(
+                        progress: progress,
+                        status: "Printing",
+                        elapsedSeconds: elapsed,
+                        estimatedSecondsRemaining: remaining
+                    )
+                }
+            }
+            #endif
         }
     }
 
@@ -371,6 +404,17 @@ final class PrinterConnectionManager {
                 modelContext.insert(job)
             }
         }
+
+        // Start Live Activity
+        #if os(iOS)
+        Task { @MainActor in
+            PrintActivityManager.shared.startActivity(
+                fileName: job.fileName ?? "Unknown",
+                printerName: printerName,
+                printerProtocol: proto.rawValue
+            )
+        }
+        #endif
     }
 
     /// Record accumulated elapsed time (on pause)
@@ -404,6 +448,18 @@ final class PrinterConnectionManager {
                 job.endDate = Date()
             }
         }
+
+        // End Live Activity
+        #if os(iOS)
+        let finalStatus = status == .completed ? "Completed" : (status == .cancelled ? "Cancelled" : "Failed")
+        let finalProgress = status == .completed ? 1.0 : 0.0
+        Task { @MainActor in
+            await PrintActivityManager.shared.endActivity(
+                finalStatus: finalStatus,
+                progress: finalProgress
+            )
+        }
+        #endif
 
         printSessionStart = nil
         activeJob = nil

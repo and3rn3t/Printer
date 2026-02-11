@@ -8,6 +8,82 @@
 import Foundation
 import SwiftData
 
+// MARK: - File Type
+
+/// Recognized 3D file formats
+enum ModelFileType: String, Codable, CaseIterable {
+    case stl
+    case obj
+    case usdz
+    case pwmx   // Anycubic Photon sliced (resin)
+    case pwma   // Anycubic Photon sliced (resin)
+    case ctb    // ChiTuBox sliced
+    case gcode  // FDM sliced
+    case threeMF = "3mf"
+    case unknown
+
+    /// Whether this format is a raw mesh that needs slicing before printing
+    var needsSlicing: Bool {
+        switch self {
+        case .stl, .obj, .usdz, .threeMF: return true
+        case .pwmx, .pwma, .ctb, .gcode: return false
+        case .unknown: return true
+        }
+    }
+
+    /// Whether this format is a sliced file ready for printing
+    var isSliced: Bool { !needsSlicing }
+
+    /// Human-readable display name
+    var displayName: String {
+        switch self {
+        case .stl: return "STL"
+        case .obj: return "OBJ"
+        case .usdz: return "USDZ"
+        case .pwmx: return "PWMX (Anycubic)"
+        case .pwma: return "PWMA (Anycubic)"
+        case .ctb: return "CTB (ChiTuBox)"
+        case .gcode: return "G-code"
+        case .threeMF: return "3MF"
+        case .unknown: return "Unknown"
+        }
+    }
+
+    /// Infer file type from a file path or URL
+    static func from(path: String) -> ModelFileType {
+        let ext = (path as NSString).pathExtension.lowercased()
+        return ModelFileType(rawValue: ext) ?? .unknown
+    }
+}
+
+// MARK: - Sort Option
+
+/// Available sort options for the model library
+enum ModelSortOption: String, CaseIterable, Identifiable {
+    case dateNewest = "Date (Newest)"
+    case dateOldest = "Date (Oldest)"
+    case nameAZ = "Name (A-Z)"
+    case nameZA = "Name (Z-A)"
+    case sizeLargest = "Size (Largest)"
+    case sizeSmallest = "Size (Smallest)"
+    case printCount = "Most Printed"
+
+    var id: String { rawValue }
+}
+
+/// Available filter options for the model library
+enum ModelFilterOption: String, CaseIterable, Identifiable {
+    case all = "All"
+    case scanned = "Scanned"
+    case imported = "Imported"
+    case downloaded = "Downloaded"
+    case favorites = "Favorites"
+    case needsSlicing = "Needs Slicing"
+    case sliced = "Print Ready"
+
+    var id: String { rawValue }
+}
+
 /// Represents a 3D model that can be printed
 @Model
 final class PrintModel {
@@ -40,10 +116,26 @@ final class PrintModel {
     
     /// Notes about the model
     var notes: String
+
+    /// Whether the user has favorited this model
+    var isFavorite: Bool
+
+    /// User-assigned tags for organization
+    var tags: [String]
     
     /// Print history
     @Relationship(deleteRule: .cascade)
     var printJobs: [PrintJob]
+
+    /// Inferred file type based on path extension
+    var fileType: ModelFileType {
+        ModelFileType.from(path: fileURL)
+    }
+
+    /// Whether this model's format needs slicing before it can be printed
+    var requiresSlicing: Bool {
+        fileType.needsSlicing
+    }
     
     init(
         name: String,
@@ -51,7 +143,9 @@ final class PrintModel {
         fileSize: Int64,
         source: ModelSource,
         thumbnailData: Data? = nil,
-        notes: String = ""
+        notes: String = "",
+        isFavorite: Bool = false,
+        tags: [String] = []
     ) {
         self.id = UUID()
         self.name = name
@@ -62,6 +156,8 @@ final class PrintModel {
         self.source = source
         self.thumbnailData = thumbnailData
         self.notes = notes
+        self.isFavorite = isFavorite
+        self.tags = tags
         self.printJobs = []
     }
 }
@@ -95,6 +191,9 @@ final class PrintJob {
 
     /// Timestamp when the print actually started on the printer (vs. when the job record was created)
     var printStartDate: Date?
+
+    /// Position in the print queue (0 = not queued, 1 = next, etc.)
+    var queuePosition: Int
 
     /// Duration of the print in a human-readable format
     var formattedDuration: String {
@@ -130,7 +229,8 @@ final class PrintJob {
         status: PrintStatus = .preparing,
         fileName: String? = nil,
         printerIP: String? = nil,
-        jobProtocol: String? = nil
+        jobProtocol: String? = nil,
+        queuePosition: Int = 0
     ) {
         self.id = UUID()
         self.startDate = Date()
@@ -140,6 +240,7 @@ final class PrintJob {
         self.printerIP = printerIP
         self.jobProtocol = jobProtocol
         self.elapsedTime = 0
+        self.queuePosition = queuePosition
     }
 }
 

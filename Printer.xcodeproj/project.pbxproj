@@ -6,7 +6,20 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		3D32AD532F3D215E00E45052 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3D32AD522F3D215E00E45052 /* WidgetKit.framework */; };
+		3D32AD552F3D215E00E45052 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3D32AD542F3D215E00E45052 /* SwiftUI.framework */; };
+		3D32AD662F3D215F00E45052 /* widgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 3D32AD502F3D215E00E45052 /* widgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
+		3D32AD642F3D215F00E45052 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 3DB923DA2F3C2A2600FFF04E /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 3D32AD4F2F3D215E00E45052;
+			remoteInfo = widgetExtension;
+		};
 		3DB923F42F3C2A2600FFF04E /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 3DB923DA2F3C2A2600FFF04E /* Project object */;
@@ -23,14 +36,38 @@
 		};
 /* End PBXContainerItemProxy section */
 
+/* Begin PBXCopyFilesBuildPhase section */
+		3D32AD6B2F3D215F00E45052 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				3D32AD662F3D215F00E45052 /* widgetExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
+		3D32AD502F3D215E00E45052 /* widgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = widgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		3D32AD522F3D215E00E45052 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		3D32AD542F3D215E00E45052 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 		3DB923E22F3C2A2600FFF04E /* Printer.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Printer.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		3DB923F32F3C2A2600FFF04E /* PrinterTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PrinterTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		3DB923FD2F3C2A2600FFF04E /* PrinterUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PrinterUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		3DB924112F3C2A2600FFF04E /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
+		3D32AD6A2F3D215F00E45052 /* Exceptions for "widget" folder in "widgetExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 3D32AD4F2F3D215E00E45052 /* widgetExtension */;
+		};
+		3DB924112F3C2A2600FFF04E /* Exceptions for "Printer" folder in "Printer" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Resources/Info.plist,
@@ -40,10 +77,18 @@
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		3D32AD562F3D215E00E45052 /* widget */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				3D32AD6A2F3D215F00E45052 /* Exceptions for "widget" folder in "widgetExtension" target */,
+			);
+			path = widget;
+			sourceTree = "<group>";
+		};
 		3DB923E42F3C2A2600FFF04E /* Printer */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				3DB924112F3C2A2600FFF04E /* PBXFileSystemSynchronizedBuildFileExceptionSet */,
+				3DB924112F3C2A2600FFF04E /* Exceptions for "Printer" folder in "Printer" target */,
 			);
 			path = Printer;
 			sourceTree = "<group>";
@@ -61,6 +106,15 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		3D32AD4D2F3D215E00E45052 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				3D32AD552F3D215E00E45052 /* SwiftUI.framework in Frameworks */,
+				3D32AD532F3D215E00E45052 /* WidgetKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		3DB923DF2F3C2A2600FFF04E /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -85,12 +139,23 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		3D32AD512F3D215E00E45052 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				3D32AD522F3D215E00E45052 /* WidgetKit.framework */,
+				3D32AD542F3D215E00E45052 /* SwiftUI.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		3DB923D92F3C2A2600FFF04E = {
 			isa = PBXGroup;
 			children = (
 				3DB923E42F3C2A2600FFF04E /* Printer */,
 				3DB923F62F3C2A2600FFF04E /* PrinterTests */,
 				3DB924002F3C2A2600FFF04E /* PrinterUITests */,
+				3D32AD562F3D215E00E45052 /* widget */,
+				3D32AD512F3D215E00E45052 /* Frameworks */,
 				3DB923E32F3C2A2600FFF04E /* Products */,
 			);
 			sourceTree = "<group>";
@@ -101,6 +166,7 @@
 				3DB923E22F3C2A2600FFF04E /* Printer.app */,
 				3DB923F32F3C2A2600FFF04E /* PrinterTests.xctest */,
 				3DB923FD2F3C2A2600FFF04E /* PrinterUITests.xctest */,
+				3D32AD502F3D215E00E45052 /* widgetExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -108,6 +174,28 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		3D32AD4F2F3D215E00E45052 /* widgetExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 3D32AD672F3D215F00E45052 /* Build configuration list for PBXNativeTarget "widgetExtension" */;
+			buildPhases = (
+				3D32AD4C2F3D215E00E45052 /* Sources */,
+				3D32AD4D2F3D215E00E45052 /* Frameworks */,
+				3D32AD4E2F3D215E00E45052 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				3D32AD562F3D215E00E45052 /* widget */,
+			);
+			name = widgetExtension;
+			packageProductDependencies = (
+			);
+			productName = widgetExtension;
+			productReference = 3D32AD502F3D215E00E45052 /* widgetExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		3DB923E12F3C2A2600FFF04E /* Printer */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 3DB924062F3C2A2600FFF04E /* Build configuration list for PBXNativeTarget "Printer" */;
@@ -115,10 +203,12 @@
 				3DB923DE2F3C2A2600FFF04E /* Sources */,
 				3DB923DF2F3C2A2600FFF04E /* Frameworks */,
 				3DB923E02F3C2A2600FFF04E /* Resources */,
+				3D32AD6B2F3D215F00E45052 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				3D32AD652F3D215F00E45052 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				3DB923E42F3C2A2600FFF04E /* Printer */,
@@ -186,6 +276,9 @@
 				LastSwiftUpdateCheck = 2620;
 				LastUpgradeCheck = 2620;
 				TargetAttributes = {
+					3D32AD4F2F3D215E00E45052 = {
+						CreatedOnToolsVersion = 26.2;
+					};
 					3DB923E12F3C2A2600FFF04E = {
 						CreatedOnToolsVersion = 26.2;
 					};
@@ -216,11 +309,19 @@
 				3DB923E12F3C2A2600FFF04E /* Printer */,
 				3DB923F22F3C2A2600FFF04E /* PrinterTests */,
 				3DB923FC2F3C2A2600FFF04E /* PrinterUITests */,
+				3D32AD4F2F3D215E00E45052 /* widgetExtension */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		3D32AD4E2F3D215E00E45052 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		3DB923E02F3C2A2600FFF04E /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -245,6 +346,13 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		3D32AD4C2F3D215E00E45052 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		3DB923DE2F3C2A2600FFF04E /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -269,6 +377,11 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		3D32AD652F3D215F00E45052 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 3D32AD4F2F3D215E00E45052 /* widgetExtension */;
+			targetProxy = 3D32AD642F3D215F00E45052 /* PBXContainerItemProxy */;
+		};
 		3DB923F52F3C2A2600FFF04E /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 3DB923E12F3C2A2600FFF04E /* Printer */;
@@ -282,6 +395,71 @@
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		3D32AD682F3D215F00E45052 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = C8U3P6AJ6L;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = widget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = widget;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = dev.andernet.Printer.widget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		3D32AD692F3D215F00E45052 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = C8U3P6AJ6L;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = widget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = widget;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = dev.andernet.Printer.widget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
 		3DB924072F3C2A2600FFF04E /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -595,6 +773,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		3D32AD672F3D215F00E45052 /* Build configuration list for PBXNativeTarget "widgetExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				3D32AD682F3D215F00E45052 /* Debug */,
+				3D32AD692F3D215F00E45052 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		3DB923DD2F3C2A2600FFF04E /* Build configuration list for PBXProject "Printer" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

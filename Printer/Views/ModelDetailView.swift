@@ -11,10 +11,18 @@ import SwiftData
 struct ModelDetailView: View {
     @Bindable var model: PrintModel
     let printers: [Printer]
+    @Environment(\.modelContext) private var modelContext
+
+    @AppStorage("showSlicingWarnings") private var showSlicingWarnings = true
+    @AppStorage("confirmBeforeDelete") private var confirmBeforeDelete = true
     
     @State private var showingPrintSheet = false
     @State private var selectedPrinter: Printer?
     @State private var isEditingName = false
+    @State private var showingShareSheet = false
+    @State private var showingDeleteConfirm = false
+    @State private var showingTagEditor = false
+    @State private var newTag = ""
     
     var body: some View {
         ScrollView {
@@ -75,6 +83,27 @@ struct ModelDetailView: View {
                     .padding(12)
                 }
                 .padding(.horizontal)
+
+                // Slicer warning banner
+                if model.requiresSlicing && showSlicingWarnings {
+                    HStack(spacing: 10) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.orange)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Slicing Required")
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                            Text("This \(model.fileType.displayName) file needs to be sliced before printing on a resin printer. Use a slicer like Anycubic Photon Workshop to generate a .pwmx file.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                    }
+                    .padding()
+                    .background(Color.orange.opacity(0.1))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .padding(.horizontal)
+                }
                 
                 // Model info card
                 VStack(spacing: 16) {
@@ -116,6 +145,18 @@ struct ModelDetailView: View {
                             label: "File Size",
                             value: ByteCountFormatter.string(fromByteCount: model.fileSize, countStyle: .file)
                         )
+
+                        InfoRow(
+                            icon: "doc.text.fill",
+                            label: "Format",
+                            value: model.fileType.displayName
+                        )
+
+                        InfoRow(
+                            icon: model.requiresSlicing ? "exclamationmark.circle" : "checkmark.seal",
+                            label: "Print Ready",
+                            value: model.requiresSlicing ? "Needs Slicing" : "Ready"
+                        )
                         
                         InfoRow(
                             icon: "calendar",
@@ -136,6 +177,59 @@ struct ModelDetailView: View {
                                 value: "\(model.printJobs.count)"
                             )
                         }
+                    }
+
+                    Divider()
+
+                    // Favorite toggle
+                    HStack {
+                        Image(systemName: model.isFavorite ? "star.fill" : "star")
+                            .foregroundStyle(model.isFavorite ? .yellow : .gray)
+                        Text("Favorite")
+                            .font(.headline)
+                        Spacer()
+                        Toggle("", isOn: $model.isFavorite)
+                            .labelsHidden()
+                    }
+
+                    // Tags section
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Image(systemName: "tag.fill")
+                                .foregroundStyle(.blue)
+                            Text("Tags")
+                                .font(.headline)
+                            Spacer()
+                            Button {
+                                showingTagEditor = true
+                            } label: {
+                                Image(systemName: "plus.circle.fill")
+                                    .foregroundStyle(.blue)
+                            }
+                            .buttonStyle(.plain)
+                        }
+
+                        if model.tags.isEmpty {
+                            Text("No tags — tap + to add")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        } else {
+                            FlowLayoutTags(tags: model.tags) { tag in
+                                model.tags.removeAll { $0 == tag }
+                            }
+                        }
+                    }
+                    .alert("Add Tag", isPresented: $showingTagEditor) {
+                        TextField("Tag name", text: $newTag)
+                        Button("Add") {
+                            let trimmed = newTag.trimmingCharacters(in: .whitespaces)
+                            if !trimmed.isEmpty && !model.tags.contains(trimmed) {
+                                model.tags.append(trimmed)
+                                model.modifiedDate = Date()
+                            }
+                            newTag = ""
+                        }
+                        Button("Cancel", role: .cancel) { newTag = "" }
                     }
                     
                     Divider()
@@ -222,6 +316,40 @@ struct ModelDetailView: View {
                         }
                         .foregroundStyle(.secondary)
                     }
+
+                    // File management actions
+                    HStack(spacing: 16) {
+                        ShareLink(item: model.resolvedFileURL) {
+                            HStack {
+                                Image(systemName: "square.and.arrow.up")
+                                Text("Export")
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.gray.opacity(0.15))
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                        }
+                        .buttonStyle(.plain)
+
+                        Button(role: .destructive) {
+                            if confirmBeforeDelete {
+                                showingDeleteConfirm = true
+                            } else {
+                                deleteModel()
+                            }
+                        } label: {
+                            HStack {
+                                Image(systemName: "trash")
+                                Text("Delete")
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.red.opacity(0.1))
+                            .foregroundStyle(.red)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
                 .padding(.horizontal)
                 .padding(.bottom)
@@ -235,6 +363,19 @@ struct ModelDetailView: View {
         .sheet(isPresented: $showingPrintSheet) {
             PrintJobView(model: model, printers: printers)
         }
+        .alert("Delete Model", isPresented: $showingDeleteConfirm) {
+            Button("Cancel", role: .cancel) { }
+            Button("Delete", role: .destructive) { deleteModel() }
+        } message: {
+            Text("Are you sure you want to delete \"\(model.name)\"? The file will be permanently removed.")
+        }
+    }
+
+    private func deleteModel() {
+        Task {
+            try? await STLFileManager.shared.deleteSTL(at: model.resolvedFileURL.path)
+        }
+        modelContext.delete(model)
     }
     
     private func sourceIcon(for source: ModelSource) -> String {
@@ -375,3 +516,35 @@ struct PrintJobRowView: View {
         }
     }
 }
+
+// MARK: - Flow Layout for Tags
+
+struct FlowLayoutTags: View {
+    let tags: [String]
+    let onRemove: (String) -> Void
+
+    var body: some View {
+        FlowLayout(spacing: 6) {
+            ForEach(tags, id: \.self) { tag in
+                HStack(spacing: 4) {
+                    Text(tag)
+                        .font(.caption)
+                    Button {
+                        onRemove(tag)
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.caption2)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(Color.blue.opacity(0.1))
+                .foregroundStyle(.blue)
+                .clipShape(Capsule())
+            }
+        }
+    }
+}
+
+// Note: FlowLayout is defined in PrintablesDetailView.swift and shared across views
