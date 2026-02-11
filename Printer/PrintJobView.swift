@@ -76,7 +76,9 @@ struct PrintJobView: View {
                 }
             }
             .navigationTitle("Send to Printer")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {

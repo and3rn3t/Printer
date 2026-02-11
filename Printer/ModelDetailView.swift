@@ -152,7 +152,7 @@ struct ModelDetailView: View {
                         TextEditor(text: $model.notes)
                             .frame(minHeight: 100)
                             .padding(8)
-                            .background(Color(.systemGray6))
+                            .background(Color.gray.opacity(0.15))
                             .clipShape(RoundedRectangle(cornerRadius: 8))
                             .onChange(of: model.notes) { _, _ in
                                 model.modifiedDate = Date()
@@ -322,7 +322,7 @@ struct PrintJobRowView: View {
         .padding(12)
         .background {
             RoundedRectangle(cornerRadius: 12)
-                .fill(Color(.systemGray6))
+                .fill(Color.gray.opacity(0.15))
         }
     }
     

@@ -131,8 +131,10 @@ struct AddPrinterView: View {
                 Section("Printer Information") {
                     TextField("Name", text: $name)
                     TextField("IP Address", text: $ipAddress)
+                        #if os(iOS)
                         .keyboardType(.decimalPad)
                         .textContentType(.none)
+                        #endif
                     TextField("Model (Optional)", text: $model)
                 }
                 
@@ -174,7 +176,9 @@ struct AddPrinterView: View {
                 }
             }
             .navigationTitle("Add Printer")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
