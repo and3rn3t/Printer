@@ -182,15 +182,24 @@ final class PrinterConnectionManager {
 
     /// Fetch status from ACT protocol printer
     private func refreshACTStatus(_ printer: Printer) async throws {
-        let status = try await photonService.getStatus(
-            ipAddress: printer.ipAddress,
-            port: printer.port
-        )
-
+        // getPrinterStatus internally calls getStatus + getSystemInfo,
+        // so we only need this single call (no separate getStatus beforehand)
         let printerStat = try await photonService.getPrinterStatus(
             ipAddress: printer.ipAddress,
             port: printer.port
         )
+
+        // Derive PhotonStatus from the combined result
+        let status: PhotonPrinterService.PhotonStatus
+        if printerStat.state.flags.printing {
+            status = .printing
+        } else if printerStat.state.flags.paused {
+            status = .paused
+        } else if printerStat.state.flags.ready || printerStat.state.flags.operational {
+            status = .idle
+        } else {
+            status = .unknown(printerStat.state.text)
+        }
 
         await MainActor.run {
             self.photonStatus = status

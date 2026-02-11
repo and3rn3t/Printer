@@ -10,6 +10,9 @@ import SwiftData
 
 @main
 struct PrinterApp: App {
+    @AppStorage("autoDeleteCompletedJobs") private var autoDeleteCompletedJobs = false
+    @AppStorage("completedJobRetentionDays") private var completedJobRetentionDays = 30
+
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
             PrintModel.self,
@@ -28,8 +31,39 @@ struct PrinterApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .task {
+                    cleanupOldJobs()
+                }
         }
         .modelContainer(sharedModelContainer)
+    }
+
+    // MARK: - Job Cleanup
+
+    /// Delete completed/failed/cancelled print jobs older than the configured retention period.
+    private func cleanupOldJobs() {
+        guard autoDeleteCompletedJobs else { return }
+        let context = sharedModelContainer.mainContext
+        let cutoff = Calendar.current.date(byAdding: .day, value: -completedJobRetentionDays, to: Date()) ?? Date()
+
+        do {
+            let descriptor = FetchDescriptor<PrintJob>()
+            let allJobs = try context.fetch(descriptor)
+            var deletedCount = 0
+
+            for job in allJobs {
+                let isTerminal = job.status == .completed || job.status == .failed || job.status == .cancelled
+                guard isTerminal, job.startDate < cutoff else { continue }
+                context.delete(job)
+                deletedCount += 1
+            }
+
+            if deletedCount > 0 {
+                try context.save()
+            }
+        } catch {
+            // Non-fatal — cleanup will retry next launch
+        }
     }
 }
 

@@ -52,22 +52,6 @@ actor STLFileManager {
         return (uniqueURL, fileSize)
     }
     
-    /// Save STL data and return the file URL and size
-    func saveSTL(data: Data, filename: String) async throws -> (url: URL, size: Int64) {
-        let url = try await stlDirectory.appendingPathComponent(filename)
-        let uniqueURL = try makeUniqueURL(url)
-        
-        try data.write(to: uniqueURL)
-        
-        return (uniqueURL, Int64(data.count))
-    }
-    
-    /// Read STL file data
-    func readSTL(at path: String) async throws -> Data {
-        let url = URL(fileURLWithPath: path)
-        return try Data(contentsOf: url)
-    }
-    
     /// Delete an STL file
     func deleteSTL(at path: String) async throws {
         let url = URL(fileURLWithPath: path)
@@ -117,22 +101,6 @@ actor STLFileManager {
         return url.lastPathComponent
     }
     
-    /// Validate STL file format (basic check)
-    func validateSTL(data: Data) -> Bool {
-        // Check if binary STL (starts with 80 bytes header, then 4 bytes for triangle count)
-        if data.count > 84 {
-            // Binary STL
-            return true
-        }
-        
-        // Check if ASCII STL (starts with "solid")
-        if let string = String(data: data.prefix(5), encoding: .ascii),
-           string.lowercased() == "solid" {
-            return true
-        }
-        
-        return false
-    }
 }
 
 extension UTType {
@@ -146,5 +114,21 @@ extension UTType {
     
     static var usdz: UTType {
         UTType(filenameExtension: "usdz") ?? .usdz
+    }
+
+    static var threeMF: UTType {
+        UTType(filenameExtension: "3mf") ?? .data
+    }
+
+    static var gcode: UTType {
+        UTType(filenameExtension: "gcode") ?? .data
+    }
+
+    static var pwmx: UTType {
+        UTType(filenameExtension: "pwmx") ?? .data
+    }
+
+    static var ctb: UTType {
+        UTType(filenameExtension: "ctb") ?? .data
     }
 }

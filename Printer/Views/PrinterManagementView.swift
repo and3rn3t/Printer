@@ -300,6 +300,16 @@ struct AddPrinterView: View {
                         .keyboardType(.decimalPad)
                         .textContentType(.none)
                         #endif
+                        .onChange(of: ipAddress) { _, _ in
+                            connectionTestResult = nil
+                        }
+                    
+                    if !ipAddress.isEmpty && !isValidIPAddress(ipAddress) {
+                        Label("Enter a valid IPv4 address (e.g. 192.168.1.49)", systemImage: "exclamationmark.triangle")
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                    }
+                    
                     TextField("Model (Optional)", text: $model)
                 }
                 
@@ -322,7 +332,7 @@ struct AddPrinterView: View {
                             }
                         }
                     }
-                    .disabled(ipAddress.isEmpty || isTestingConnection)
+                    .disabled(ipAddress.isEmpty || !isValidIPAddress(ipAddress) || isTestingConnection)
                     
                     if let result = connectionTestResult {
                         switch result {
@@ -355,7 +365,7 @@ struct AddPrinterView: View {
                     Button("Add") {
                         addPrinter()
                     }
-                    .disabled(name.isEmpty || ipAddress.isEmpty)
+                    .disabled(name.isEmpty || ipAddress.isEmpty || !isValidIPAddress(ipAddress))
                 }
             }
             .sheet(isPresented: $showingDiscovery) {

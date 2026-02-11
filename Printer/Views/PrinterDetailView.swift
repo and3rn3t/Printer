@@ -51,6 +51,27 @@ struct PrinterDetailView: View {
             // System information
             systemInfoSection
 
+            // Printer file browser (OctoPrint only)
+            if printer.printerProtocol == .octoprint && manager.connectionState.isConnected {
+                Section {
+                    NavigationLink {
+                        PrinterFileBrowserView(printer: printer)
+                    } label: {
+                        Label {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Printer Files")
+                                Text("Browse and manage files on this printer")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        } icon: {
+                            Image(systemName: "folder")
+                                .foregroundStyle(.blue)
+                        }
+                    }
+                }
+            }
+
             // Recent print history
             if !recentJobs.isEmpty {
                 recentHistorySection
@@ -544,14 +565,6 @@ struct PrinterDetailView: View {
         }
     }
 
-    private func formatDuration(_ seconds: Double) -> String {
-        let hours = Int(seconds) / 3600
-        let minutes = (Int(seconds) % 3600) / 60
-        if hours > 0 {
-            return "\(hours)h \(minutes)m"
-        }
-        return "\(minutes)m"
-    }
 }
 
 // MARK: - Pulse Animation

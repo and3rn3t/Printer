@@ -103,7 +103,7 @@ struct ContentView: View {
         }
         .fileImporter(
             isPresented: $showingImporter,
-            allowedContentTypes: [.stl, .obj, .usdz],
+            allowedContentTypes: [.stl, .obj, .usdz, .threeMF, .gcode, .pwmx, .ctb],
             allowsMultipleSelection: true
         ) { result in
             Task {
@@ -208,25 +208,33 @@ struct ContentView: View {
                 guard url.startAccessingSecurityScopedResource() else { continue }
                 defer { url.stopAccessingSecurityScopedResource() }
                 
-                // Convert if needed
-                let stlURL: URL
                 let ext = url.pathExtension.lowercased()
+                let fileType = ModelFileType.from(path: url.path)
                 
+                // Determine the file to import
+                let importURL: URL
                 if ext == "obj" || ext == "usdz" {
+                    // Convert mesh formats to STL
                     if ext == "obj" {
-                        stlURL = try await converter.convertOBJToSTL(objURL: url)
+                        importURL = try await converter.convertOBJToSTL(objURL: url)
                     } else {
-                        stlURL = try await converter.convertUSDZToSTL(usdzURL: url)
+                        importURL = try await converter.convertUSDZToSTL(usdzURL: url)
                     }
                 } else {
-                    stlURL = url
+                    // STL, 3MF, and sliced formats (gcode, pwmx, ctb) — import as-is
+                    importURL = url
                 }
                 
                 // Import the file
-                let (fileURL, fileSize) = try await STLFileManager.shared.importSTL(from: stlURL)
+                let (fileURL, fileSize) = try await STLFileManager.shared.importSTL(from: importURL)
                 
-                // Generate thumbnail
-                let thumbnailData = try? await converter.generateThumbnail(from: fileURL)
+                // Generate thumbnail only for mesh formats that SceneKit can render
+                let thumbnailData: Data?
+                if fileType.needsSlicing && (ext == "stl" || ext == "obj" || ext == "usdz") {
+                    thumbnailData = try? await converter.generateThumbnail(from: fileURL)
+                } else {
+                    thumbnailData = nil
+                }
                 
                 // Store as relative path for container resilience
                 let relativePath = await STLFileManager.shared.relativePath(for: fileURL)
@@ -589,9 +597,9 @@ struct ModelRowView: View {
                 
                 HStack(spacing: 8) {
                     Label {
-                        Text(sourceText(for: model.source))
+                        Text(model.source.displayText)
                     } icon: {
-                        Image(systemName: sourceIcon(for: model.source))
+                        Image(systemName: model.source.icon)
                     }
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -631,21 +639,6 @@ struct ModelRowView: View {
         .padding(.vertical, 8)
     }
     
-    private func sourceIcon(for source: ModelSource) -> String {
-        switch source {
-        case .scanned: return "camera.fill"
-        case .imported: return "square.and.arrow.down.fill"
-        case .downloaded: return "arrow.down.circle.fill"
-        }
-    }
-    
-    private func sourceText(for source: ModelSource) -> String {
-        switch source {
-        case .scanned: return "Scanned"
-        case .imported: return "Imported"
-        case .downloaded: return "Downloaded"
-        }
-    }
 }
 
 #Preview {

@@ -15,12 +15,16 @@ struct PrintJobView: View {
     let model: PrintModel
     let printers: [Printer]
     
+    @AppStorage("defaultPrinterID") private var defaultPrinterID: String = ""
+    
     @State private var selectedPrinter: Printer?
     @State private var uploadProgress: Double = 0
     @State private var isUploading = false
     @State private var uploadError: String?
     @State private var startPrintAfterUpload = true
     @State private var uploadPhase: UploadPhase = .idle
+    /// For ACT printers, the user must specify the filename as it exists on the printer's USB
+    @State private var actFilename: String = ""
     
     enum UploadPhase: Equatable {
         case idle
@@ -29,6 +33,11 @@ struct PrintJobView: View {
         case startingPrint
         case complete
         case failed(String)
+    }
+    
+    /// Whether the selected printer uses ACT protocol (resin printers with no HTTP upload)
+    private var isACTPrinter: Bool {
+        selectedPrinter?.printerProtocol == .act
     }
     
     var body: some View {
@@ -61,14 +70,43 @@ struct PrintJobView: View {
                 Section("Model") {
                     LabeledContent("Name", value: model.name)
                     LabeledContent("Size", value: ByteCountFormatter.string(fromByteCount: model.fileSize, countStyle: .file))
+                    
+                    if let printer = selectedPrinter {
+                        LabeledContent("Protocol") {
+                            Text(printer.printerProtocol == .act ? "ACT (TCP)" : "OctoPrint (HTTP)")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                 }
                 
-                Section {
-                    Toggle("Start printing after upload", isOn: $startPrintAfterUpload)
+                // ACT printer: file must already be on USB
+                if isACTPrinter {
+                    Section {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Label("Resin Printer (ACT Protocol)", systemImage: "exclamationmark.triangle.fill")
+                                .font(.subheadline)
+                                .foregroundStyle(.orange)
+                            
+                            Text("This printer uses the ACT protocol. Files cannot be uploaded over the network — they must be copied to USB manually. Enter the filename as it appears on the printer's USB drive to start printing.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        
+                        TextField("Filename on USB (e.g. model.pwmx)", text: $actFilename)
+                            #if os(iOS)
+                            .textContentType(.none)
+                            #endif
+                    } header: {
+                        Text("Print File")
+                    }
+                } else {
+                    Section {
+                        Toggle("Start printing after upload", isOn: $startPrintAfterUpload)
+                    }
                 }
                 
                 if isUploading {
-                    Section("Upload Progress") {
+                    Section("Progress") {
                         VStack(spacing: 12) {
                             ProgressView(value: uploadProgress)
                                 .animation(.easeInOut(duration: 0.3), value: uploadProgress)
@@ -79,10 +117,12 @@ struct PrintJobView: View {
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                                 Spacer()
-                                Text("\(Int(uploadProgress * 100))%")
-                                    .font(.caption)
-                                    .fontWeight(.medium)
-                                    .monospacedDigit()
+                                if !isACTPrinter {
+                                    Text("\(Int(uploadProgress * 100))%")
+                                        .font(.caption)
+                                        .fontWeight(.medium)
+                                        .monospacedDigit()
+                                }
                             }
                         }
                     }
@@ -118,13 +158,29 @@ struct PrintJobView: View {
                 }
                 
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Send") {
+                    Button(isACTPrinter ? "Print" : "Send") {
                         sendToPrinter()
                     }
-                    .disabled(selectedPrinter == nil || isUploading)
+                    .disabled(sendButtonDisabled)
                 }
             }
+            .onAppear {
+                preselectDefaultPrinter()
+            }
         }
+    }
+    
+    /// Whether the send/print button should be disabled
+    private var sendButtonDisabled: Bool {
+        if selectedPrinter == nil || isUploading { return true }
+        if isACTPrinter && actFilename.trimmingCharacters(in: .whitespaces).isEmpty { return true }
+        return false
+    }
+    
+    /// Pre-select the default printer from settings if available
+    private func preselectDefaultPrinter() {
+        guard selectedPrinter == nil, !defaultPrinterID.isEmpty else { return }
+        selectedPrinter = printers.first { $0.id.uuidString == defaultPrinterID }
     }
     
     // MARK: - Phase Display
@@ -175,56 +231,74 @@ struct PrintJobView: View {
         uploadPhase = .preparing
         
         Task {
+            // Create print job record
+            let fileName = isACTPrinter ? actFilename : "\(model.name).stl"
+            let job = PrintJob(
+                printerName: printer.name,
+                status: isACTPrinter ? .printing : .uploading,
+                fileName: fileName,
+                printerIP: printer.ipAddress,
+                jobProtocol: printer.printerProtocol.rawValue
+            )
+            job.model = model
+            model.printJobs.append(job)
+            modelContext.insert(job)
+            
             do {
-                // Create print job
-                let job = PrintJob(
-                    printerName: printer.name,
-                    status: .uploading,
-                    fileName: "\(model.name).stl",
-                    printerIP: printer.ipAddress,
-                    jobProtocol: printer.printerProtocol.rawValue
-                )
-                job.model = model
-                model.printJobs.append(job)
-                modelContext.insert(job)
-                
-                // Read file
-                let fileURL = model.resolvedFileURL
-                
-                // Upload to printer with real progress tracking
-                let api = AnycubicPrinterAPI()
-                
-                await MainActor.run {
-                    uploadPhase = .uploading
-                }
-                
-                try await api.uploadFile(
-                    ipAddress: printer.ipAddress,
-                    apiKey: printer.apiKey,
-                    fileURL: fileURL,
-                    filename: "\(model.name).stl"
-                ) { progress in
-                    Task { @MainActor in
-                        uploadProgress = progress
-                    }
-                }
-                
-                // Start printing if requested
-                if startPrintAfterUpload {
+                if isACTPrinter {
+                    // ACT protocol — send goprint command directly (file must be on USB)
                     await MainActor.run {
                         uploadPhase = .startingPrint
+                        uploadProgress = 0.5
                     }
                     
-                    job.status = .printing
-                    job.printStartDate = Date()
+                    let api = AnycubicPrinterAPI()
                     try await api.startPrint(
                         ipAddress: printer.ipAddress,
                         apiKey: printer.apiKey,
-                        filename: "\(model.name).stl",
+                        filename: actFilename.trimmingCharacters(in: .whitespaces),
                         protocol: printer.printerProtocol
                     )
+                    
+                    job.status = .printing
+                    job.printStartDate = Date()
+                    
                 } else {
-                    job.status = .queued
+                    // HTTP protocol — upload file then optionally start print
+                    let fileURL = model.resolvedFileURL
+                    let api = AnycubicPrinterAPI()
+                    
+                    await MainActor.run {
+                        uploadPhase = .uploading
+                    }
+                    
+                    try await api.uploadFile(
+                        ipAddress: printer.ipAddress,
+                        apiKey: printer.apiKey,
+                        fileURL: fileURL,
+                        filename: "\(model.name).stl"
+                    ) { progress in
+                        Task { @MainActor in
+                            uploadProgress = progress
+                        }
+                    }
+                    
+                    if startPrintAfterUpload {
+                        await MainActor.run {
+                            uploadPhase = .startingPrint
+                        }
+                        
+                        job.status = .printing
+                        job.printStartDate = Date()
+                        try await api.startPrint(
+                            ipAddress: printer.ipAddress,
+                            apiKey: printer.apiKey,
+                            filename: "\(model.name).stl",
+                            protocol: printer.printerProtocol
+                        )
+                    } else {
+                        job.status = .queued
+                    }
                 }
                 
                 // Update printer connection status
@@ -233,9 +307,9 @@ struct PrintJobView: View {
                 
                 await MainActor.run {
                     uploadPhase = .complete
+                    uploadProgress = 1.0
                     isUploading = false
                     
-                    // Dismiss after brief delay to show completion
                     Task {
                         try? await Task.sleep(for: .seconds(1))
                         dismiss()
@@ -243,6 +317,10 @@ struct PrintJobView: View {
                 }
                 
             } catch {
+                // Rollback: mark the job as failed instead of leaving it in uploading state
+                job.status = .failed
+                job.endDate = Date()
+                
                 await MainActor.run {
                     isUploading = false
                     uploadPhase = .failed(error.localizedDescription)

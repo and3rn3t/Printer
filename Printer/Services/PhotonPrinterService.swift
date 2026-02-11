@@ -255,21 +255,6 @@ actor PhotonPrinterService {
         return PhotonStatus(rawValue: statusString)
     }
 
-    /// Get the current printer mode
-    ///
-    /// Sends `getmode` → receives `getmode,<mode>,end`
-    /// Mode 0 = idle, other values may indicate specific states
-    func getMode(ipAddress: String, port: Int = defaultPort) async throws -> Int {
-        let response = try await sendCommand(
-            ipAddress: ipAddress, port: port, command: "getmode")
-
-        guard let modeString = response.first, let mode = Int(modeString) else {
-            throw PhotonError.invalidResponse("Invalid mode response")
-        }
-
-        return mode
-    }
-
     /// Get system information
     ///
     /// Sends `sysinfo` → receives `sysinfo,<model>,<firmware>,<serial>,<wifi>,end`

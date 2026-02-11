@@ -161,12 +161,7 @@ struct PrintHistoryView: View {
 
     private var totalPrintTime: String {
         let total = allJobs.reduce(0.0) { $0 + $1.effectiveDuration }
-        let hours = Int(total) / 3600
-        let minutes = (Int(total) % 3600) / 60
-        if hours > 0 {
-            return "\(hours)h \(minutes)m"
-        }
-        return "\(minutes)m"
+        return formatDuration(total)
     }
 
     // MARK: - Actions
@@ -249,37 +244,7 @@ struct PrintHistoryRowView: View {
 
     // MARK: - Status Styling
 
-    private var statusIcon: String {
-        switch job.status {
-        case .preparing: return "clock.fill"
-        case .uploading: return "arrow.up.circle.fill"
-        case .queued: return "tray.fill"
-        case .printing: return "printer.fill"
-        case .completed: return "checkmark.circle.fill"
-        case .failed: return "xmark.circle.fill"
-        case .cancelled: return "xmark.circle"
-        }
-    }
-
-    private var statusColor: Color {
-        switch job.status {
-        case .preparing, .uploading, .queued: return .orange
-        case .printing: return .blue
-        case .completed: return .green
-        case .failed: return .red
-        case .cancelled: return .gray
-        }
-    }
-
-    private var statusText: String {
-        switch job.status {
-        case .preparing: return "Preparing"
-        case .uploading: return "Uploading"
-        case .queued: return "Queued"
-        case .printing: return "Printing"
-        case .completed: return "Completed"
-        case .failed: return "Failed"
-        case .cancelled: return "Cancelled"
-        }
-    }
+    private var statusIcon: String { job.status.icon }
+    private var statusColor: Color { job.status.color }
+    private var statusText: String { job.status.displayText }
 }
