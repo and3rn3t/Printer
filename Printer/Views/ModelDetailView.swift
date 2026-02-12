@@ -88,7 +88,7 @@ struct ModelDetailView: View {
                     }
                     .frame(maxHeight: 400)
                     .clipShape(RoundedRectangle(cornerRadius: 16))
-                    .shadow(color: .black.opacity(0.15), radius: 10, y: 5)
+                    .shadow(color: .primary.opacity(0.08), radius: 10, y: 5)
 
                     // Source badge + 3D toggle
                     HStack(spacing: 8) {
@@ -147,8 +147,7 @@ struct ModelDetailView: View {
                         Spacer()
                     }
                     .padding()
-                    .background(Color.orange.opacity(0.1))
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .background(Color.orange.opacity(0.1), in: RoundedRectangle(cornerRadius: 12))
                     .padding(.horizontal)
                 }
 
@@ -471,7 +470,7 @@ struct ModelDetailView: View {
                         TextEditor(text: $model.notes)
                             .frame(minHeight: 100)
                             .padding(8)
-                            .background(Color.gray.opacity(0.15))
+                            .background(.fill.tertiary)
                             .clipShape(RoundedRectangle(cornerRadius: 8))
                             .onChange(of: model.notes) { _, _ in
                                 model.modifiedDate = Date()
@@ -479,11 +478,7 @@ struct ModelDetailView: View {
                     }
                 }
                 .padding()
-                .background {
-                    RoundedRectangle(cornerRadius: 16)
-                        .fill(.background)
-                        .shadow(color: .black.opacity(0.05), radius: 8, y: 4)
-                }
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
                 .padding(.horizontal)
 
                 // Print history
@@ -504,11 +499,7 @@ struct ModelDetailView: View {
                         }
                     }
                     .padding()
-                    .background {
-                        RoundedRectangle(cornerRadius: 16)
-                            .fill(.background)
-                            .shadow(color: .black.opacity(0.05), radius: 8, y: 4)
-                    }
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
                     .padding(.horizontal)
                 }
 
@@ -519,17 +510,12 @@ struct ModelDetailView: View {
                     } label: {
                         HStack {
                             Image(systemName: "printer.fill")
-                                .font(.headline)
                             Text("Send to Printer")
-                                .font(.headline)
                         }
                         .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(printers.isEmpty ? Color.gray : Color.blue)
-                        .foregroundStyle(.white)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                        .shadow(color: printers.isEmpty ? .clear : .blue.opacity(0.3), radius: 8, y: 4)
                     }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
                     .disabled(printers.isEmpty)
 
                     if printers.isEmpty {
@@ -552,11 +538,8 @@ struct ModelDetailView: View {
                                 Text("Collect")
                             }
                             .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(Color.gray.opacity(0.15))
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.bordered)
 
                         ShareLink(item: model.resolvedFileURL) {
                             HStack {
@@ -564,11 +547,8 @@ struct ModelDetailView: View {
                                 Text("Export")
                             }
                             .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(Color.gray.opacity(0.15))
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.bordered)
 
                         Button(role: .destructive) {
                             if confirmBeforeDelete {
@@ -582,12 +562,8 @@ struct ModelDetailView: View {
                                 Text("Delete")
                             }
                             .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(Color.red.opacity(0.1))
-                            .foregroundStyle(.red)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.bordered)
                     }
                 }
                 .padding(.horizontal)
@@ -735,20 +711,10 @@ struct PrintJobRowView: View {
             Spacer()
 
             // Status badge
-            Text(statusText)
-                .font(.caption)
-                .fontWeight(.medium)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .background(statusColor.opacity(0.15))
-                .foregroundStyle(statusColor)
-                .clipShape(Capsule())
+            StatusBadge(text: statusText, color: statusColor, size: .small)
         }
         .padding(12)
-        .background {
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color.gray.opacity(0.15))
-        }
+        .background(.fill.tertiary, in: RoundedRectangle(cornerRadius: 12))
     }
 
     private var statusIcon: String { job.status.icon }

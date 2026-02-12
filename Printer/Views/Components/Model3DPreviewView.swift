@@ -27,7 +27,7 @@ struct Model3DPreviewView: View {
             if isLoading {
                 ProgressView("Loading 3D Model…")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Color.gray.opacity(0.05))
+                    .background(.fill.quaternary)
             } else if let scene {
                 SceneKitContainer(scene: scene)
                     .clipShape(RoundedRectangle(cornerRadius: 16))

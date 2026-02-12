@@ -222,8 +222,7 @@ struct CostAnalyticsView: View {
                 .foregroundStyle(.secondary)
         }
         .padding(12)
-        .background(color.opacity(0.08))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .background(color.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
     }
 
     // MARK: - Budget Card
@@ -258,8 +257,7 @@ struct CostAnalyticsView: View {
             .tint(isOver ? .red : .blue)
         }
         .padding()
-        .background(Color.gray.opacity(0.08))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .background(.fill.tertiary, in: RoundedRectangle(cornerRadius: 12))
         .padding(.horizontal)
     }
 
@@ -395,8 +393,7 @@ struct CostAnalyticsView: View {
                         }
                     }
                     .padding(.vertical, 8)
-                    .background(Color.gray.opacity(0.06))
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .background(.fill.tertiary, in: RoundedRectangle(cornerRadius: 12))
                     .padding(.horizontal)
                 }
             }

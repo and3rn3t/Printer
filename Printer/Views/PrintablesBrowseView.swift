@@ -191,7 +191,6 @@ struct PrintablesBrowseView: View {
                 }
             }
         }
-        .listStyle(.inset)
     }
 
     // MARK: - Actions
@@ -318,7 +317,7 @@ struct PrintablesResultRow: View {
     @ViewBuilder
     private var placeholderImage: some View {
         ZStack {
-            Color.gray.opacity(0.15)
+            Color.gray.opacity(0.12)
             Image(systemName: "cube.transparent")
                 .font(.title3)
                 .foregroundStyle(.secondary)

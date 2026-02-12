@@ -5,8 +5,8 @@
 //  Created by Matt on 2/11/26.
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 /// Manage material inventory — bottles, spools, and stock levels.
 struct InventoryView: View {
@@ -51,7 +51,8 @@ struct InventoryView: View {
                     ContentUnavailableView(
                         "No Inventory",
                         systemImage: "shippingbox",
-                        description: Text("Add resin bottles or filament spools to track your stock")
+                        description: Text(
+                            "Add resin bottles or filament spools to track your stock")
                     )
                 } else {
                     ForEach(activeItems) { item in
@@ -100,25 +101,16 @@ struct InventoryView: View {
     ) -> some View {
         HStack(spacing: 12) {
             // Volume gauge
-            ZStack {
-                Circle()
-                    .stroke(Color.gray.opacity(0.2), lineWidth: 4)
-                    .frame(width: 44, height: 44)
-
-                Circle()
-                    .trim(from: 0, to: 1.0 - item.usagePercentage)
-                    .stroke(
-                        gaugeColor(for: item),
-                        style: StrokeStyle(lineWidth: 4, lineCap: .round)
-                    )
-                    .frame(width: 44, height: 44)
-                    .rotationEffect(.degrees(-90))
-
+            Gauge(value: 1.0 - item.usagePercentage) {
+                EmptyView()
+            } currentValueLabel: {
                 Text("\(Int((1.0 - item.usagePercentage) * 100))")
                     .font(.caption2)
                     .fontWeight(.bold)
-                    .foregroundStyle(gaugeColor(for: item))
             }
+            .gaugeStyle(.accessoryCircularCapacity)
+            .tint(gaugeColor(for: item))
+            .frame(width: 44, height: 44)
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(item.name)
@@ -155,9 +147,11 @@ struct InventoryView: View {
                     .fontWeight(.medium)
                     .foregroundStyle(showWarning ? .orange : (showDepleted ? .red : .primary))
 
-                Text("of \(Int(item.initialVolume)) \(item.resinProfile?.materialType.isResin == true ? "mL" : "g")")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                Text(
+                    "of \(Int(item.initialVolume)) \(item.resinProfile?.materialType.isResin == true ? "mL" : "g")"
+                )
+                .font(.caption2)
+                .foregroundStyle(.secondary)
             }
         }
     }
@@ -229,7 +223,7 @@ struct AddInventoryItemView: View {
                             .multilineTextAlignment(.trailing)
                             .frame(width: 80)
                             #if os(iOS)
-                            .keyboardType(.decimalPad)
+                                .keyboardType(.decimalPad)
                             #endif
                         Text(selectedProfile?.materialType.isResin == true ? "mL" : "g")
                             .foregroundStyle(.secondary)
@@ -242,7 +236,7 @@ struct AddInventoryItemView: View {
                             .multilineTextAlignment(.trailing)
                             .frame(width: 80)
                             #if os(iOS)
-                            .keyboardType(.decimalPad)
+                                .keyboardType(.decimalPad)
                             #endif
                         Text(selectedProfile?.materialType.isResin == true ? "mL" : "g")
                             .foregroundStyle(.secondary)
@@ -252,7 +246,8 @@ struct AddInventoryItemView: View {
                 }
 
                 Section {
-                    DatePicker("Purchase Date", selection: $purchaseDate, displayedComponents: .date)
+                    DatePicker(
+                        "Purchase Date", selection: $purchaseDate, displayedComponents: .date)
 
                     HStack {
                         Text("Cost")
@@ -260,19 +255,22 @@ struct AddInventoryItemView: View {
                         TextField(
                             "0.00",
                             value: $purchaseCost,
-                            format: .currency(code: UserDefaults.standard.string(forKey: "resinCurrency") ?? "USD")
+                            format: .currency(
+                                code: UserDefaults.standard.string(forKey: "resinCurrency") ?? "USD"
+                            )
                         )
-                            .multilineTextAlignment(.trailing)
-                            .frame(width: 100)
-                            #if os(iOS)
+                        .multilineTextAlignment(.trailing)
+                        .frame(width: 100)
+                        #if os(iOS)
                             .keyboardType(.decimalPad)
-                            #endif
+                        #endif
                     }
 
                     Toggle("Has Expiry Date", isOn: $hasExpiry)
 
                     if hasExpiry {
-                        DatePicker("Expiry Date", selection: $expiryDate, displayedComponents: .date)
+                        DatePicker(
+                            "Expiry Date", selection: $expiryDate, displayedComponents: .date)
                     }
                 } header: {
                     Label("Purchase", systemImage: "cart.fill")
@@ -280,7 +278,7 @@ struct AddInventoryItemView: View {
             }
             .navigationTitle("Add Inventory")
             #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
+                .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -290,7 +288,8 @@ struct AddInventoryItemView: View {
                     Button("Add") {
                         addItem()
                     }
-                    .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty || initialVolume <= 0)
+                    .disabled(
+                        name.trimmingCharacters(in: .whitespaces).isEmpty || initialVolume <= 0)
                 }
             }
         }
@@ -323,21 +322,9 @@ struct InventoryItemDetailView: View {
             // Volume gauge hero
             Section {
                 VStack(spacing: 16) {
-                    ZStack {
-                        Circle()
-                            .stroke(Color.gray.opacity(0.15), lineWidth: 12)
-                            .frame(width: 120, height: 120)
-
-                        Circle()
-                            .trim(from: 0, to: 1.0 - item.usagePercentage)
-                            .stroke(
-                                gaugeColor,
-                                style: StrokeStyle(lineWidth: 12, lineCap: .round)
-                            )
-                            .frame(width: 120, height: 120)
-                            .rotationEffect(.degrees(-90))
-                            .animation(.easeInOut(duration: 0.5), value: item.usagePercentage)
-
+                    Gauge(value: 1.0 - item.usagePercentage) {
+                        EmptyView()
+                    } currentValueLabel: {
                         VStack(spacing: 2) {
                             Text("\(Int((1.0 - item.usagePercentage) * 100))%")
                                 .font(.title)
@@ -347,6 +334,10 @@ struct InventoryItemDetailView: View {
                                 .foregroundStyle(.secondary)
                         }
                     }
+                    .gaugeStyle(.accessoryCircularCapacity)
+                    .tint(gaugeColor)
+                    .scaleEffect(2.5)
+                    .frame(width: 120, height: 120)
 
                     HStack(spacing: 24) {
                         VStack {
@@ -367,9 +358,14 @@ struct InventoryItemDetailView: View {
                         }
 
                         VStack {
-                            let usedUnit = item.resinProfile?.materialType.isResin == true ? "mL" : "g"
-                            Text(String(format: "%.0f %@", item.initialVolume - item.remainingVolume, usedUnit))
-                                .font(.headline)
+                            let usedUnit =
+                                item.resinProfile?.materialType.isResin == true ? "mL" : "g"
+                            Text(
+                                String(
+                                    format: "%.0f %@", item.initialVolume - item.remainingVolume,
+                                    usedUnit)
+                            )
+                            .font(.headline)
                             Text("Used")
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
@@ -408,7 +404,8 @@ struct InventoryItemDetailView: View {
                 }
 
                 if let cost = item.purchaseCost, cost > 0 {
-                    let currencyCode = UserDefaults.standard.string(forKey: "resinCurrency") ?? "USD"
+                    let currencyCode =
+                        UserDefaults.standard.string(forKey: "resinCurrency") ?? "USD"
                     LabeledContent {
                         Text(cost, format: .currency(code: currencyCode))
                     } label: {
@@ -459,7 +456,7 @@ struct InventoryItemDetailView: View {
         .alert("Deduct Volume", isPresented: $showingManualDeduct) {
             TextField("Amount", value: $deductAmount, format: .number)
                 #if os(iOS)
-                .keyboardType(.decimalPad)
+                    .keyboardType(.decimalPad)
                 #endif
             Button("Deduct") {
                 item.deduct(deductAmount)
@@ -467,7 +464,9 @@ struct InventoryItemDetailView: View {
             }
             Button("Cancel", role: .cancel) { deductAmount = 0 }
         } message: {
-            Text("Enter the volume to deduct (in \(item.resinProfile?.materialType.isResin == true ? "mL" : "g")).")
+            Text(
+                "Enter the volume to deduct (in \(item.resinProfile?.materialType.isResin == true ? "mL" : "g"))."
+            )
         }
     }
 

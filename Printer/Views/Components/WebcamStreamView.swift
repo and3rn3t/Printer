@@ -50,7 +50,7 @@ struct WebcamStreamView: View {
                     }
             } else if isLoading {
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.gray.opacity(0.15))
+                    .fill(.fill.tertiary)
                     .aspectRatio(16 / 9, contentMode: .fit)
                     .overlay {
                         ProgressView("Connecting to camera...")
@@ -58,7 +58,7 @@ struct WebcamStreamView: View {
                     }
             } else if let error {
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.gray.opacity(0.15))
+                    .fill(.fill.tertiary)
                     .aspectRatio(16 / 9, contentMode: .fit)
                     .overlay {
                         VStack(spacing: 8) {

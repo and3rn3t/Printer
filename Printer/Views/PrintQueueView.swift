@@ -218,14 +218,7 @@ struct QueueJobRow: View {
             Spacer()
 
             // Status badge
-            Text(statusText)
-                .font(.caption2)
-                .fontWeight(.semibold)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(statusColor.opacity(0.15))
-                .foregroundStyle(statusColor)
-                .clipShape(Capsule())
+            StatusBadge(text: statusText, color: statusColor, size: .small)
         }
         .padding(.vertical, 4)
     }

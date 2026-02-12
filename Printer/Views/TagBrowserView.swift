@@ -233,9 +233,10 @@ struct TagBrowserView: View {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 7)
-            .background(isSelected ? Color.blue : Color.gray.opacity(0.15))
+            .background {
+                Capsule().fill(isSelected ? AnyShapeStyle(Color.blue) : AnyShapeStyle(.fill.tertiary))
+            }
             .foregroundStyle(isSelected ? .white : .primary)
-            .clipShape(Capsule())
         }
         .buttonStyle(.plain)
     }

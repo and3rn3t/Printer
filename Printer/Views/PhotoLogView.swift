@@ -158,7 +158,7 @@ private struct SnapshotThumbnail: View {
                     }
             } else {
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(Color.gray.opacity(0.15))
+                    .fill(.fill.tertiary)
                     .frame(height: 100)
                     .overlay {
                         Image(systemName: "photo")

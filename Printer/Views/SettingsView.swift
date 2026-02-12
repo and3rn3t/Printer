@@ -12,7 +12,7 @@ import OSLog
 // MARK: - Settings View
 
 struct SettingsView: View {
-    @Environment(\.dismiss) private var dismiss
+
     @Environment(\.modelContext) private var modelContext
     @Query private var models: [PrintModel]
     @Query private var printers: [Printer]
@@ -71,13 +71,8 @@ struct SettingsView: View {
             }
             .navigationTitle("Settings")
             #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarTitleDisplayMode(.large)
             #endif
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
-                }
-            }
             .alert("Clear Thumbnail Cache", isPresented: $showingClearCacheConfirm) {
                 Button("Cancel", role: .cancel) { }
                 Button("Clear", role: .destructive) { clearThumbnailCache() }

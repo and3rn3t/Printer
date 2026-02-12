@@ -10,7 +10,6 @@ import SwiftData
 import OSLog
 
 struct PrinterManagementView: View {
-    @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @Query private var printers: [Printer]
 
@@ -60,12 +59,6 @@ struct PrinterManagementView: View {
             }
             .navigationTitle("Printers")
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                }
-
                 ToolbarItem(placement: .primaryAction) {
                     Button {
                         showingAddPrinter = true

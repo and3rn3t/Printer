@@ -240,7 +240,6 @@ struct PrintablesDetailView: View {
                 }
             }
         }
-        .listStyle(.inset)
     }
 
     // MARK: - Subviews
@@ -301,7 +300,7 @@ struct PrintablesDetailView: View {
     @ViewBuilder
     private var imagePlaceholder: some View {
         ZStack {
-            Color.gray.opacity(0.15)
+            Color.gray.opacity(0.12)
             Image(systemName: "photo")
                 .font(.title)
                 .foregroundStyle(.secondary)

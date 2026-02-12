@@ -15,7 +15,7 @@ import Combine
 /// Note: Full Object Capture API requires macOS. On iOS, we provide a simplified capture interface.
 struct ObjectScannerView: View {
     @Environment(\.dismiss) private var dismiss
-    @StateObject private var scanManager = ObjectScanManager()
+    @State private var scanManager = ObjectScanManager()
 
     let onComplete: (URL) -> Void
 
@@ -54,8 +54,8 @@ struct ObjectScannerView: View {
                             )
                         }
                         .padding()
-                        .background(.quaternary.opacity(0.5))
-                        .cornerRadius(12)
+                        .background(.fill.quaternary)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
 
                         Text("Then export your scan as STL or OBJ and import it into this app.")
                             .font(.footnote)
@@ -119,21 +119,18 @@ struct ScanningAppRow: View {
 
 /// Manages device capabilities for scanning
 @MainActor
-class ObjectScanManager: ObservableObject {
-    @Published var error: Error?
+@Observable
+class ObjectScanManager {
+    var error: Error?
 
     var isLiDARAvailable: Bool {
-        // Check if device has LiDAR by checking for AVCaptureDevice with depth capability
-        if #available(iOS 15.4, *) {
-            let devices = AVCaptureDevice.DiscoverySession(
-                deviceTypes: [.builtInLiDARDepthCamera],
-                mediaType: .video,
-                position: .back
-            ).devices
+        let devices = AVCaptureDevice.DiscoverySession(
+            deviceTypes: [.builtInLiDARDepthCamera],
+            mediaType: .video,
+            position: .back
+        ).devices
 
-            return !devices.isEmpty
-        }
-        return false
+        return !devices.isEmpty
     }
 }
 

@@ -5,9 +5,9 @@
 //  Created by Matt on 2/11/26.
 //
 
-import SwiftUI
-import SwiftData
 import OSLog
+import SwiftData
+import SwiftUI
 
 /// Single-glance dashboard showing all printers' live status, active prints, and recent activity.
 struct DashboardView: View {
@@ -93,10 +93,12 @@ struct DashboardView: View {
                         )
                         .frame(height: 200)
                     } else {
-                        LazyVGrid(columns: [
-                            GridItem(.flexible(), spacing: 12),
-                            GridItem(.flexible(), spacing: 12)
-                        ], spacing: 12) {
+                        LazyVGrid(
+                            columns: [
+                                GridItem(.flexible(), spacing: 12),
+                                GridItem(.flexible(), spacing: 12),
+                            ], spacing: 12
+                        ) {
                             ForEach(printers) { printer in
                                 printerStatusCard(printer: printer)
                             }
@@ -137,8 +139,9 @@ struct DashboardView: View {
                             }
                         }
                         .padding(.vertical, 8)
-                        .background(Color.orange.opacity(0.06))
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .background(
+                            Color.orange.opacity(0.06), in: RoundedRectangle(cornerRadius: 12)
+                        )
                         .padding(.horizontal)
                     }
                 }
@@ -208,7 +211,7 @@ struct DashboardView: View {
         .onDisappear { refreshTimer?.invalidate() }
         .refreshable { refreshAllPrinters() }
         .alert("Error", isPresented: $showingError) {
-            Button("OK", role: .cancel) { }
+            Button("OK", role: .cancel) {}
         } message: {
             Text(errorMessage ?? "An unknown error occurred.")
         }
@@ -218,80 +221,73 @@ struct DashboardView: View {
 
     @ViewBuilder
     private func activePrintCard(printer: Printer, state: PrinterLiveState) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Image(systemName: "printer.fill")
-                    .foregroundStyle(.blue)
-                Text(printer.name)
-                    .font(.headline)
-                Spacer()
-                if let status = state.photonStatus {
-                    Text(status.displayText)
-                        .font(.caption)
-                        .fontWeight(.medium)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(status == .printing ? Color.blue.opacity(0.15) : Color.orange.opacity(0.15))
-                        .foregroundStyle(status == .printing ? .blue : .orange)
-                        .clipShape(Capsule())
-                }
-            }
-
-            if let fileName = state.fileName {
-                Text(fileName)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
-
-            if let progress = state.progress {
-                VStack(spacing: 4) {
-                    ProgressView(value: progress)
-                        .tint(.blue)
-
-                    HStack {
-                        Text("\(Int(progress * 100))%")
-                            .font(.caption)
-                            .fontWeight(.medium)
-                            .foregroundStyle(.blue)
-
-                        Spacer()
-
-                        if let curr = state.currentLayer, let total = state.totalLayers {
-                            Text("Layer \(curr)/\(total)")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
+        GroupBox {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Image(systemName: "printer.fill")
+                        .foregroundStyle(.blue)
+                    Text(printer.name)
+                        .font(.headline)
+                    Spacer()
+                    if let status = state.photonStatus {
+                        StatusBadge(
+                            text: status.displayText,
+                            color: status == .printing ? .blue : .orange
+                        )
                     }
                 }
 
-                // ETA countdown
-                if let eta = state.estimatedCompletionDate {
-                    HStack(spacing: 6) {
-                        Image(systemName: "clock.badge.checkmark")
-                            .font(.caption)
-                            .foregroundStyle(.green)
-                        Text("ETA \(eta.formatted(date: .omitted, time: .shortened))")
-                            .font(.caption)
-                            .fontWeight(.medium)
-                            .foregroundStyle(.green)
-                        Spacer()
-                        if let remaining = state.estimatedTimeRemaining, remaining > 0 {
-                            Text(Self.formatCountdown(remaining))
+                if let fileName = state.fileName {
+                    Text(fileName)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+
+                if let progress = state.progress {
+                    VStack(spacing: 4) {
+                        ProgressView(value: progress)
+                            .tint(.blue)
+
+                        HStack {
+                            Text("\(Int(progress * 100))%")
                                 .font(.caption)
-                                .monospacedDigit()
-                                .foregroundStyle(.secondary)
+                                .fontWeight(.medium)
+                                .foregroundStyle(.blue)
+
+                            Spacer()
+
+                            if let curr = state.currentLayer, let total = state.totalLayers {
+                                Text("Layer \(curr)/\(total)")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+
+                    // ETA countdown
+                    if let eta = state.estimatedCompletionDate {
+                        HStack(spacing: 6) {
+                            Image(systemName: "clock.badge.checkmark")
+                                .font(.caption)
+                                .foregroundStyle(.green)
+                            Text("ETA \(eta.formatted(date: .omitted, time: .shortened))")
+                                .font(.caption)
+                                .fontWeight(.medium)
+                                .foregroundStyle(.green)
+                            Spacer()
+                            if let remaining = state.estimatedTimeRemaining, remaining > 0 {
+                                Text(Self.formatCountdown(remaining))
+                                    .font(.caption)
+                                    .monospacedDigit()
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                     }
                 }
             }
         }
-        .padding()
-        .background {
-            RoundedRectangle(cornerRadius: 16)
-                .fill(.background)
-                .shadow(color: .blue.opacity(0.15), radius: 8, y: 4)
-        }
+        .backgroundStyle(.fill.tertiary)
         .padding(.horizontal)
     }
 
@@ -305,7 +301,11 @@ struct DashboardView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Circle()
-                    .fill(isOnline ? Color.green : (state?.isReachable == nil ? Color.gray.opacity(0.4) : Color.red))
+                    .fill(
+                        isOnline
+                            ? Color.green
+                            : (state?.isReachable == nil ? Color.gray.opacity(0.4) : Color.red)
+                    )
                     .frame(width: 10, height: 10)
                 Spacer()
                 Text(printer.printerProtocol.rawValue.uppercased())
@@ -344,16 +344,15 @@ struct DashboardView: View {
         }
         .padding()
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background {
-            RoundedRectangle(cornerRadius: 14)
-                .fill(Color.gray.opacity(0.1))
-        }
+        .background(.fill.tertiary, in: RoundedRectangle(cornerRadius: 14))
     }
 
     // MARK: - Quick Stat Card
 
     @ViewBuilder
-    private func quickStatCard(title: String, value: String, icon: String, color: Color) -> some View {
+    private func quickStatCard(title: String, value: String, icon: String, color: Color)
+        -> some View
+    {
         VStack(spacing: 6) {
             Image(systemName: icon)
                 .font(.title2)
@@ -367,10 +366,7 @@ struct DashboardView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 12)
-        .background {
-            RoundedRectangle(cornerRadius: 12)
-                .fill(color.opacity(0.08))
-        }
+        .background(color.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
     }
 
     // MARK: - Recent Job Row
@@ -401,20 +397,10 @@ struct DashboardView: View {
 
             Spacer()
 
-            Text(job.status.displayText)
-                .font(.caption2)
-                .fontWeight(.medium)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 3)
-                .background(job.status.color.opacity(0.12))
-                .foregroundStyle(job.status.color)
-                .clipShape(Capsule())
+            StatusBadge(text: job.status.displayText, color: job.status.color, size: .small)
         }
         .padding(10)
-        .background {
-            RoundedRectangle(cornerRadius: 10)
-                .fill(Color.gray.opacity(0.08))
-        }
+        .background(.fill.tertiary, in: RoundedRectangle(cornerRadius: 10))
     }
 
     // MARK: - Helpers
@@ -440,7 +426,8 @@ struct DashboardView: View {
         let cal = Calendar.current
         let start = cal.date(from: cal.dateComponents([.year, .month], from: Date())) ?? Date()
         guard resinCostPerMl > 0 else { return 0 }
-        return allJobs
+        return
+            allJobs
             .filter { $0.status == .completed && $0.startDate >= start }
             .reduce(0) { sum, job in
                 let vol = Double(job.model?.slicedVolumeMl ?? 0)
@@ -460,9 +447,11 @@ struct DashboardView: View {
                 .foregroundStyle(.green)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text("This Month: \(costCurrencySymbol)\(String(format: "%.2f", totalSpendThisMonth))")
-                    .font(.subheadline)
-                    .fontWeight(.medium)
+                Text(
+                    "This Month: \(costCurrencySymbol)\(String(format: "%.2f", totalSpendThisMonth))"
+                )
+                .font(.subheadline)
+                .fontWeight(.medium)
                 if monthlyBudget > 0 {
                     let remaining = monthlyBudget - totalSpendThisMonth
                     Text(
@@ -470,8 +459,8 @@ struct DashboardView: View {
                             ? "\(costCurrencySymbol)\(String(format: "%.2f", remaining)) remaining"
                             : "Over budget!"
                     )
-                        .font(.caption)
-                        .foregroundStyle(remaining >= 0 ? .green : .red)
+                    .font(.caption)
+                    .foregroundStyle(remaining >= 0 ? .green : .red)
                 }
             }
 
@@ -482,8 +471,7 @@ struct DashboardView: View {
                 .foregroundStyle(.secondary)
         }
         .padding(12)
-        .background(Color.gray.opacity(0.08))
-        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .background(.fill.tertiary, in: RoundedRectangle(cornerRadius: 10))
     }
 
     private var successRate: String {
@@ -509,7 +497,8 @@ struct DashboardView: View {
                             printerStates[printer.id] = state
                         }
                     } else {
-                        AppLogger.network.debug("Dashboard: ACT status check failed for \(printer.name)")
+                        AppLogger.network.debug(
+                            "Dashboard: ACT status check failed for \(printer.name)")
                         await MainActor.run {
                             var state = printerStates[printer.id] ?? PrinterLiveState()
                             state.isReachable = false
@@ -537,7 +526,8 @@ struct DashboardView: View {
                                 state.progress = job.progress?.completion.map { $0 / 100.0 }
                                 if let remaining = job.progress?.printTimeLeft, remaining > 0 {
                                     state.estimatedTimeRemaining = remaining
-                                    state.estimatedCompletionDate = Date().addingTimeInterval(remaining)
+                                    state.estimatedCompletionDate = Date().addingTimeInterval(
+                                        remaining)
                                 }
                                 printerStates[printer.id] = state
                             }

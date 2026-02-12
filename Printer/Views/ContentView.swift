@@ -5,10 +5,10 @@
 //  Created by Matt on 2/10/26.
 //
 
-import SwiftUI
-import SwiftData
-import UniformTypeIdentifiers
 import OSLog
+import SwiftData
+import SwiftUI
+import UniformTypeIdentifiers
 
 // MARK: - Shared File Import Helper
 
@@ -85,37 +85,49 @@ struct ContentView: View {
     @State private var selectedModel: PrintModel?
     @State private var showingScanner = false
     @State private var showingImporter = false
-    @State private var showingPrinterSetup = false
     @State private var showingPrintHistory = false
     @State private var showingPrintables = false
-    @State private var showingSettings = false
     @State private var showingPrintQueue = false
     @State private var showingStatistics = false
     @State private var showingCollections = false
     @State private var showingTagBrowser = false
     @State private var columnVisibility = NavigationSplitViewVisibility.all
-    @State private var selectedTab = 0
+    @State private var selectedTab: AppTab = .dashboard
     @State private var errorMessage: String?
     @State private var showingError = false
 
+    /// App-level tab identifiers for type-safe tab selection.
+    enum AppTab: Hashable {
+        case dashboard
+        case library
+        case printers
+        case settings
+    }
+
     var body: some View {
         TabView(selection: $selectedTab) {
-            // Dashboard tab
-            NavigationStack {
-                DashboardView()
-            }
-            .tabItem {
-                Label("Dashboard", systemImage: "gauge.with.dots.needle.bottom.50percent")
-            }
-            .tag(0)
-
-            // Library tab
-            libraryContent
-                .tabItem {
-                    Label("Library", systemImage: "cube.transparent")
+            Tab(
+                "Dashboard", systemImage: "gauge.with.dots.needle.bottom.50percent",
+                value: .dashboard
+            ) {
+                NavigationStack {
+                    DashboardView()
                 }
-                .tag(1)
+            }
+
+            Tab("Library", systemImage: "cube.transparent", value: .library) {
+                libraryContent
+            }
+
+            Tab("Printers", systemImage: "printer.fill", value: .printers) {
+                PrinterManagementView()
+            }
+
+            Tab("Settings", systemImage: "gear", value: .settings) {
+                SettingsView()
+            }
         }
+        .tabViewStyle(.sidebarAdaptable)
         .sheet(isPresented: $showingScanner) {
             ObjectScannerView { url in
                 Task {
@@ -135,9 +147,6 @@ struct ContentView: View {
         .sheet(isPresented: $showingPrintables) {
             PrintablesBrowseView()
         }
-        .sheet(isPresented: $showingPrinterSetup) {
-            PrinterManagementView()
-        }
         .sheet(isPresented: $showingPrintHistory) {
             NavigationStack {
                 PrintHistoryView()
@@ -149,9 +158,6 @@ struct ContentView: View {
                         }
                     }
             }
-        }
-        .sheet(isPresented: $showingSettings) {
-            SettingsView()
         }
         .sheet(isPresented: $showingPrintQueue) {
             PrintQueueView()
@@ -173,7 +179,7 @@ struct ContentView: View {
             TagBrowserView()
         }
         .alert("Error", isPresented: $showingError) {
-            Button("OK", role: .cancel) { }
+            Button("OK", role: .cancel) {}
         } message: {
             Text(errorMessage ?? "An unknown error occurred.")
         }
@@ -192,8 +198,6 @@ struct ContentView: View {
                     showImporter: { showingImporter = true },
                     showPrintables: { showingPrintables = true },
                     showPrintHistory: { showingPrintHistory = true },
-                    showPrinterSetup: { showingPrinterSetup = true },
-                    showSettings: { showingSettings = true },
                     showPrintQueue: { showingPrintQueue = true },
                     showStatistics: { showingStatistics = true },
                     showCollections: { showingCollections = true },
@@ -354,8 +358,6 @@ struct ModelListView: View {
         var showImporter: () -> Void = {}
         var showPrintables: () -> Void = {}
         var showPrintHistory: () -> Void = {}
-        var showPrinterSetup: () -> Void = {}
-        var showSettings: () -> Void = {}
         var showPrintQueue: () -> Void = {}
         var showStatistics: () -> Void = {}
         var showCollections: () -> Void = {}
@@ -398,9 +400,8 @@ struct ModelListView: View {
         if !searchText.isEmpty {
             let query = searchText.lowercased()
             result = result.filter {
-                $0.name.lowercased().contains(query) ||
-                $0.notes.lowercased().contains(query) ||
-                $0.tags.contains { $0.lowercased().contains(query) }
+                $0.name.lowercased().contains(query) || $0.notes.lowercased().contains(query)
+                    || $0.tags.contains { $0.lowercased().contains(query) }
             }
         }
 
@@ -408,8 +409,10 @@ struct ModelListView: View {
         switch sortOption {
         case .dateNewest: result.sort { $0.modifiedDate > $1.modifiedDate }
         case .dateOldest: result.sort { $0.modifiedDate < $1.modifiedDate }
-        case .nameAZ: result.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
-        case .nameZA: result.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedDescending }
+        case .nameAZ:
+            result.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        case .nameZA:
+            result.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedDescending }
         case .sizeLargest: result.sort { $0.fileSize > $1.fileSize }
         case .sizeSmallest: result.sort { $0.fileSize < $1.fileSize }
         case .printCount: result.sort { $0.printJobs.count > $1.printJobs.count }
@@ -470,9 +473,7 @@ struct ModelListView: View {
                 }
                 .padding()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-#if os(iOS)
-                .background(Color(.systemGroupedBackground))
-#endif
+                .background(.background)
             } else {
                 ZStack(alignment: .bottom) {
                     List(selection: isSelectMode ? nil : $selectedModel) {
@@ -500,9 +501,14 @@ struct ModelListView: View {
                         ForEach(filteredModels) { model in
                             if isSelectMode {
                                 HStack(spacing: 12) {
-                                    Image(systemName: selectedModelIDs.contains(model.id) ? "checkmark.circle.fill" : "circle")
-                                        .foregroundStyle(selectedModelIDs.contains(model.id) ? .blue : .secondary)
-                                        .font(.title3)
+                                    Image(
+                                        systemName: selectedModelIDs.contains(model.id)
+                                            ? "checkmark.circle.fill" : "circle"
+                                    )
+                                    .foregroundStyle(
+                                        selectedModelIDs.contains(model.id) ? .blue : .secondary
+                                    )
+                                    .font(.title3)
                                     ModelRowView(model: model)
                                 }
                                 .contentShape(Rectangle())
@@ -526,7 +532,8 @@ struct ModelListView: View {
                                     } label: {
                                         Label(
                                             model.isFavorite ? "Unfavorite" : "Favorite",
-                                            systemImage: model.isFavorite ? "star.slash" : "star.fill"
+                                            systemImage: model.isFavorite
+                                                ? "star.slash" : "star.fill"
                                         )
                                     }
                                     .tint(.yellow)
@@ -558,9 +565,9 @@ struct ModelListView: View {
             }
         }
         .navigationTitle("3D Models")
-#if os(macOS)
-        .navigationSplitViewColumnWidth(min: 200, ideal: 250)
-#endif
+        #if os(macOS)
+            .navigationSplitViewColumnWidth(min: 200, ideal: 250)
+        #endif
         .toolbar {
             modelListToolbar
         }
@@ -583,18 +590,18 @@ struct ModelListView: View {
 
     @ToolbarContentBuilder
     private var modelListToolbar: some ToolbarContent {
-#if os(iOS)
-        ToolbarItem(placement: .navigationBarTrailing) {
-            Button(isSelectMode ? "Done" : "Select") {
-                withAnimation {
-                    isSelectMode.toggle()
-                    if !isSelectMode {
-                        selectedModelIDs.removeAll()
+        #if os(iOS)
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button(isSelectMode ? "Done" : "Select") {
+                    withAnimation {
+                        isSelectMode.toggle()
+                        if !isSelectMode {
+                            selectedModelIDs.removeAll()
+                        }
                     }
                 }
             }
-        }
-#endif
+        #endif
         ToolbarItem(placement: .primaryAction) {
             Menu {
                 Button {
@@ -660,22 +667,6 @@ struct ModelListView: View {
                 }
             } label: {
                 Label("More", systemImage: "ellipsis.circle")
-            }
-        }
-
-        ToolbarItem(placement: .primaryAction) {
-            Button {
-                actions.showPrinterSetup()
-            } label: {
-                Label("Printers", systemImage: "printer")
-            }
-        }
-
-        ToolbarItem(placement: .primaryAction) {
-            Button {
-                actions.showSettings()
-            } label: {
-                Label("Settings", systemImage: "gear")
             }
         }
     }
@@ -862,7 +853,7 @@ struct BatchAddToCollectionView: View {
             }
             .navigationTitle("Add to Collection")
             #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
+                .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -892,19 +883,19 @@ struct ModelRowView: View {
             // Thumbnail with gradient placeholder
             Group {
                 if let thumbnailData = model.thumbnailData {
-#if os(macOS)
-                    if let nsImage = NSImage(data: thumbnailData) {
-                        Image(nsImage: nsImage)
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                    }
-#else
-                    if let uiImage = UIImage(data: thumbnailData) {
-                        Image(uiImage: uiImage)
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                    }
-#endif
+                    #if os(macOS)
+                        if let nsImage = NSImage(data: thumbnailData) {
+                            Image(nsImage: nsImage)
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                        }
+                    #else
+                        if let uiImage = UIImage(data: thumbnailData) {
+                            Image(uiImage: uiImage)
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                        }
+                    #endif
                 } else {
                     ZStack {
                         LinearGradient(
@@ -951,30 +942,27 @@ struct ModelRowView: View {
                         .foregroundStyle(.secondary)
                         .font(.caption)
 
-                    Text(ByteCountFormatter.string(fromByteCount: model.fileSize, countStyle: .file))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    Text(
+                        ByteCountFormatter.string(fromByteCount: model.fileSize, countStyle: .file)
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
 
                     // File type badge
-                    Text(model.fileType.displayName)
-                        .font(.caption2)
-                        .fontWeight(.medium)
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 1)
-                        .background(model.requiresSlicing ? Color.orange.opacity(0.15) : Color.green.opacity(0.15))
-                        .foregroundStyle(model.requiresSlicing ? .orange : .green)
-                        .clipShape(Capsule())
+                    StatusBadge(
+                        text: model.fileType.displayName,
+                        color: model.requiresSlicing ? .orange : .green,
+                        size: .small
+                    )
 
                     // Pre-sliced indicator for downloaded sliced files
                     if model.fileType.isSliced && model.hasSlicedMetadata {
-                        Label("Sliced", systemImage: "checkmark.seal.fill")
-                            .font(.caption2)
-                            .fontWeight(.medium)
-                            .padding(.horizontal, 5)
-                            .padding(.vertical, 1)
-                            .background(Color.blue.opacity(0.15))
-                            .foregroundStyle(.blue)
-                            .clipShape(Capsule())
+                        StatusBadge(
+                            text: "Sliced",
+                            color: .blue,
+                            icon: "checkmark.seal.fill",
+                            size: .small
+                        )
                     }
                 }
 
@@ -982,8 +970,10 @@ struct ModelRowView: View {
                     HStack(spacing: 4) {
                         Image(systemName: "printer.fill")
                             .font(.caption2)
-                        Text("\(model.printJobs.count) print\(model.printJobs.count == 1 ? "" : "s")")
-                            .font(.caption2)
+                        Text(
+                            "\(model.printJobs.count) print\(model.printJobs.count == 1 ? "" : "s")"
+                        )
+                        .font(.caption2)
                     }
                     .foregroundStyle(.blue)
                 }

@@ -73,7 +73,7 @@ struct BuildPlateView: View {
                         .frame(width: plateW, height: plateH)
                         .background(
                             RoundedRectangle(cornerRadius: 4)
-                                .fill(Color.gray.opacity(0.08))
+                                .fill(.fill.tertiary)
                         )
 
                     // FEP stress zone for resin printers (center 60%)
