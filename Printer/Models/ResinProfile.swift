@@ -93,6 +93,20 @@ enum MaterialType: String, Codable, CaseIterable, Identifiable {
     }
 
     var icon: String {
-        isResin ? "drop.fill" : "circle.dotted"
+        switch self {
+        case .standardResin: return "drop.fill"
+        case .absLikeResin: return "drop.halffull"
+        case .waterWashable: return "drop.degreesign.fill"
+        case .plantBased: return "leaf.fill"
+        case .tough: return "shield.fill"
+        case .flexible: return "wind"
+        case .castable: return "flame.fill"
+        case .dental: return "cross.case.fill"
+        case .pla: return "cylinder.fill"
+        case .abs: return "cylinder.split.1x2.fill"
+        case .petg: return "cube.fill"
+        case .tpu: return "waveform.path"
+        case .nylon: return "bolt.fill"
+        }
     }
 }

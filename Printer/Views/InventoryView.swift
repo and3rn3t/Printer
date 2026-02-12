@@ -202,7 +202,7 @@ struct AddInventoryItemView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Details") {
+                Section {
                     TextField("Name (e.g. Elegoo Grey 500mL)", text: $name)
 
                     Picker("Material Profile", selection: $selectedProfile) {
@@ -217,9 +217,11 @@ struct AddInventoryItemView: View {
                             .tag(profile as ResinProfile?)
                         }
                     }
+                } header: {
+                    Label("Details", systemImage: "info.circle")
                 }
 
-                Section("Volume") {
+                Section {
                     HStack {
                         Text("Initial Volume")
                         Spacer()
@@ -245,9 +247,11 @@ struct AddInventoryItemView: View {
                         Text(selectedProfile?.materialType.isResin == true ? "mL" : "g")
                             .foregroundStyle(.secondary)
                     }
+                } header: {
+                    Label("Volume", systemImage: "drop.fill")
                 }
 
-                Section("Purchase") {
+                Section {
                     DatePicker("Purchase Date", selection: $purchaseDate, displayedComponents: .date)
 
                     HStack {
@@ -270,6 +274,8 @@ struct AddInventoryItemView: View {
                     if hasExpiry {
                         DatePicker("Expiry Date", selection: $expiryDate, displayedComponents: .date)
                     }
+                } header: {
+                    Label("Purchase", systemImage: "cart.fill")
                 }
             }
             .navigationTitle("Add Inventory")
@@ -375,56 +381,78 @@ struct InventoryItemDetailView: View {
             }
 
             // Details
-            Section("Details") {
+            Section {
                 if let profile = item.resinProfile {
-                    LabeledContent("Material") {
+                    LabeledContent {
                         HStack(spacing: 4) {
                             Circle()
                                 .fill(Color(hex: profile.colorHex) ?? .gray)
                                 .frame(width: 10, height: 10)
                             Text(profile.name)
                         }
+                    } label: {
+                        Label("Material", systemImage: profile.materialType.icon)
                     }
                 }
 
-                Toggle("Opened", isOn: $item.isOpened)
+                Toggle(isOn: $item.isOpened) {
+                    Label("Opened", systemImage: "shippingbox")
+                }
 
                 if let date = item.purchaseDate {
-                    LabeledContent("Purchased", value: date.formatted(date: .abbreviated, time: .omitted))
+                    LabeledContent {
+                        Text(date.formatted(date: .abbreviated, time: .omitted))
+                    } label: {
+                        Label("Purchased", systemImage: "calendar")
+                    }
                 }
 
                 if let cost = item.purchaseCost, cost > 0 {
                     let currencyCode = UserDefaults.standard.string(forKey: "resinCurrency") ?? "USD"
-                    LabeledContent("Cost") {
+                    LabeledContent {
                         Text(cost, format: .currency(code: currencyCode))
+                    } label: {
+                        Label("Cost", systemImage: "dollarsign.circle")
                     }
                 }
 
                 if let expiry = item.expiryDate {
-                    LabeledContent("Expires") {
+                    LabeledContent {
                         Text(expiry.formatted(date: .abbreviated, time: .omitted))
                             .foregroundStyle(item.isExpired ? .red : .primary)
+                    } label: {
+                        Label("Expires", systemImage: "calendar.badge.exclamationmark")
                     }
                 }
 
-                LabeledContent("Low Stock Alert") {
+                LabeledContent {
                     let unit = item.resinProfile?.materialType.isResin == true ? "mL" : "g"
                     Text(String(format: "%.0f %@", item.lowStockThreshold, unit))
+                } label: {
+                    Label("Low Stock Alert", systemImage: "exclamationmark.triangle")
                 }
+            } header: {
+                Label("Details", systemImage: "info.circle")
             }
 
             // Manual deduction
-            Section("Manual Adjustment") {
-                Button("Deduct Volume…") {
+            Section {
+                Button {
                     showingManualDeduct = true
+                } label: {
+                    Label("Deduct Volume…", systemImage: "minus.circle.fill")
                 }
                 .disabled(item.isDepleted)
+            } header: {
+                Label("Manual Adjustment", systemImage: "slider.horizontal.3")
             }
 
             // Notes
-            Section("Notes") {
+            Section {
                 TextEditor(text: $item.notes)
                     .frame(minHeight: 80)
+            } header: {
+                Label("Notes", systemImage: "note.text")
             }
         }
         .navigationTitle(item.name)

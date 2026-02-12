@@ -606,7 +606,7 @@ struct ModelListView: View {
                 Button {
                     actions.showImporter()
                 } label: {
-                    Label("Import File", systemImage: "square.and.arrow.down")
+                    Label("Import File", systemImage: "square.and.arrow.down.fill")
                 }
             } label: {
                 Label("Add Model", systemImage: "plus")
@@ -687,11 +687,10 @@ struct ModelListView: View {
                     Button {
                         sortOptionRaw = option.rawValue
                     } label: {
-                        HStack {
+                        Label {
                             Text(option.rawValue)
-                            if sortOption == option {
-                                Image(systemName: "checkmark")
-                            }
+                        } icon: {
+                            Image(systemName: sortOption == option ? "checkmark" : option.icon)
                         }
                     }
                 }
@@ -702,11 +701,10 @@ struct ModelListView: View {
                     Button {
                         filterOption = option
                     } label: {
-                        HStack {
+                        Label {
                             Text(option.rawValue)
-                            if filterOption == option {
-                                Image(systemName: "checkmark")
-                            }
+                        } icon: {
+                            Image(systemName: filterOption == option ? "checkmark" : option.icon)
                         }
                     }
                 }

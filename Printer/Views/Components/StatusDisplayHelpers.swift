@@ -81,6 +81,15 @@ extension PrinterProtocol {
         case .anycubicHTTP: return "HTTP"
         }
     }
+
+    /// SF Symbol representing this protocol
+    var icon: String {
+        switch self {
+        case .act: return "antenna.radiowaves.left.and.right"
+        case .octoprint: return "globe"
+        case .anycubicHTTP: return "network"
+        }
+    }
 }
 
 // MARK: - PhotonStatus Display Helpers

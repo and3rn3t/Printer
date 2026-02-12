@@ -5,8 +5,8 @@
 //  Created by Matt on 2/11/26.
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 /// List and manage resin / material profiles.
 struct ResinProfileListView: View {
@@ -123,54 +123,98 @@ struct ResinProfileDetailView: View {
             }
 
             Section("Material") {
-                LabeledContent("Type", value: profile.materialType.rawValue)
+                LabeledContent {
+                    Text(profile.materialType.rawValue)
+                } label: {
+                    Label("Type", systemImage: profile.materialType.icon)
+                }
                 if !profile.color.isEmpty {
-                    LabeledContent("Color", value: profile.color)
+                    LabeledContent {
+                        Text(profile.color)
+                    } label: {
+                        Label("Color", systemImage: "paintpalette.fill")
+                    }
                 }
                 if profile.costPerMl > 0 {
-                    LabeledContent("Cost / mL") {
-                        let currencyCode = UserDefaults.standard.string(forKey: "resinCurrency") ?? "USD"
+                    LabeledContent {
+                        let currencyCode =
+                            UserDefaults.standard.string(forKey: "resinCurrency") ?? "USD"
                         Text(profile.costPerMl, format: .currency(code: currencyCode))
+                    } label: {
+                        Label("Cost / mL", systemImage: "dollarsign.circle")
                     }
                 }
             }
 
-            if profile.normalExposure != nil || profile.bottomExposure != nil || profile.bottomLayers != nil {
-                Section("Exposure Settings") {
+            if profile.normalExposure != nil || profile.bottomExposure != nil
+                || profile.bottomLayers != nil
+            {
+                Section {
                     if let exp = profile.normalExposure {
-                        LabeledContent("Normal Exposure", value: String(format: "%.1fs", exp))
+                        LabeledContent {
+                            Text(String(format: "%.1fs", exp))
+                        } label: {
+                            Label("Normal Exposure", systemImage: "sun.max.fill")
+                        }
                     }
                     if let bExp = profile.bottomExposure {
-                        LabeledContent("Bottom Exposure", value: String(format: "%.1fs", bExp))
+                        LabeledContent {
+                            Text(String(format: "%.1fs", bExp))
+                        } label: {
+                            Label(
+                                "Bottom Exposure",
+                                systemImage: "sun.max.trianglebadge.exclamationmark")
+                        }
                     }
                     if let bLayers = profile.bottomLayers {
-                        LabeledContent("Bottom Layers", value: "\(bLayers)")
+                        LabeledContent {
+                            Text("\(bLayers)")
+                        } label: {
+                            Label("Bottom Layers", systemImage: "square.stack.3d.up")
+                        }
                     }
                     if let lh = profile.recommendedLayerHeight {
-                        LabeledContent("Layer Height", value: String(format: "%.3f mm", lh))
+                        LabeledContent {
+                            Text(String(format: "%.3f mm", lh))
+                        } label: {
+                            Label("Layer Height", systemImage: "ruler")
+                        }
                     }
+                } header: {
+                    Label("Exposure Settings", systemImage: "sun.max.fill")
                 }
             }
 
             if !profile.notes.isEmpty {
-                Section("Notes") {
+                Section {
                     Text(profile.notes)
                         .font(.subheadline)
+                } header: {
+                    Label("Notes", systemImage: "note.text")
                 }
             }
 
             if !profile.printJobs.isEmpty {
-                Section("Print History") {
-                    Text("\(profile.printJobs.count) print jobs used this material")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                Section {
+                    Label {
+                        Text("\(profile.printJobs.count) print jobs used this material")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    } icon: {
+                        Image(systemName: "printer.fill")
+                            .foregroundStyle(.blue)
+                    }
+                } header: {
+                    Label("Print History", systemImage: "clock.arrow.circlepath")
                 }
             }
         }
         .navigationTitle(profile.name)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button { showingEdit = true } label: {
+                Button {
+                    showingEdit = true
+                } label: {
                     Label("Edit", systemImage: "pencil.circle")
                 }
             }
@@ -206,52 +250,64 @@ struct EditResinProfileView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Basic Info") {
+                Section {
                     TextField("Name", text: $name)
                     TextField("Brand", text: $brand)
                     TextField("Color name", text: $color)
 
                     Picker("Material Type", selection: $materialType) {
                         ForEach(MaterialType.allCases) { type in
-                            Text(type.rawValue).tag(type)
+                            Label(type.rawValue, systemImage: type.icon).tag(type)
                         }
                     }
+                } header: {
+                    Label("Basic Info", systemImage: "info.circle")
                 }
 
-                Section("Cost") {
+                Section {
                     HStack {
                         Text("Cost / mL")
                         Spacer()
-                        TextField("0.00", value: $costPerMl, format: .number.precision(.fractionLength(3)))
-                            .multilineTextAlignment(.trailing)
-                            .frame(width: 80)
-                            #if os(iOS)
+                        TextField(
+                            "0.00", value: $costPerMl, format: .number.precision(.fractionLength(3))
+                        )
+                        .multilineTextAlignment(.trailing)
+                        .frame(width: 80)
+                        #if os(iOS)
                             .keyboardType(.decimalPad)
-                            #endif
+                        #endif
                     }
+                } header: {
+                    Label("Cost", systemImage: "dollarsign.circle")
                 }
 
                 if materialType.isResin {
-                    Section("Exposure Settings (Optional)") {
+                    Section {
                         HStack {
                             Text("Normal Exposure (s)")
                             Spacer()
-                            TextField("—", value: $normalExposure, format: .number.precision(.fractionLength(1)))
-                                .multilineTextAlignment(.trailing)
-                                .frame(width: 60)
-                                #if os(iOS)
+                            TextField(
+                                "—", value: $normalExposure,
+                                format: .number.precision(.fractionLength(1))
+                            )
+                            .multilineTextAlignment(.trailing)
+                            .frame(width: 60)
+                            #if os(iOS)
                                 .keyboardType(.decimalPad)
-                                #endif
+                            #endif
                         }
                         HStack {
                             Text("Bottom Exposure (s)")
                             Spacer()
-                            TextField("—", value: $bottomExposure, format: .number.precision(.fractionLength(1)))
-                                .multilineTextAlignment(.trailing)
-                                .frame(width: 60)
-                                #if os(iOS)
+                            TextField(
+                                "—", value: $bottomExposure,
+                                format: .number.precision(.fractionLength(1))
+                            )
+                            .multilineTextAlignment(.trailing)
+                            .frame(width: 60)
+                            #if os(iOS)
                                 .keyboardType(.decimalPad)
-                                #endif
+                            #endif
                         }
                         HStack {
                             Text("Bottom Layers")
@@ -260,30 +316,37 @@ struct EditResinProfileView: View {
                                 .multilineTextAlignment(.trailing)
                                 .frame(width: 60)
                                 #if os(iOS)
-                                .keyboardType(.numberPad)
+                                    .keyboardType(.numberPad)
                                 #endif
                         }
                         HStack {
                             Text("Layer Height (mm)")
                             Spacer()
-                            TextField("—", value: $layerHeight, format: .number.precision(.fractionLength(3)))
-                                .multilineTextAlignment(.trailing)
-                                .frame(width: 60)
-                                #if os(iOS)
+                            TextField(
+                                "—", value: $layerHeight,
+                                format: .number.precision(.fractionLength(3))
+                            )
+                            .multilineTextAlignment(.trailing)
+                            .frame(width: 60)
+                            #if os(iOS)
                                 .keyboardType(.decimalPad)
-                                #endif
+                            #endif
                         }
+                    } header: {
+                        Label("Exposure Settings", systemImage: "sun.max.fill")
                     }
                 }
 
-                Section("Notes") {
+                Section {
                     TextField("Wash & cure notes, etc.", text: $notes, axis: .vertical)
                         .lineLimit(4)
+                } header: {
+                    Label("Notes", systemImage: "note.text")
                 }
             }
             .navigationTitle(isEditing ? "Edit Profile" : "New Profile")
             #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
+                .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

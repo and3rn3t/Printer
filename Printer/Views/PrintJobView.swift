@@ -45,7 +45,7 @@ struct PrintJobView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Select Printer") {
+                Section {
                     if printers.isEmpty {
                         ContentUnavailableView(
                             "No Printers",
@@ -69,26 +69,38 @@ struct PrintJobView: View {
                             }
                         }
                     }
+                } header: {
+                    Label("Select Printer", systemImage: "printer.fill")
                 }
 
-                Section("Model") {
-                    LabeledContent("Name", value: model.name)
-                    LabeledContent(
-                        "Size",
-                        value: ByteCountFormatter.string(
+                Section {
+                    LabeledContent {
+                        Text(model.name)
+                    } label: {
+                        Label("Name", systemImage: "cube.transparent")
+                    }
+                    LabeledContent {
+                        Text(ByteCountFormatter.string(
                             fromByteCount: model.fileSize, countStyle: .file))
+                    } label: {
+                        Label("Size", systemImage: "doc.fill")
+                    }
 
                     if let printer = selectedPrinter {
-                        LabeledContent("Protocol") {
+                        LabeledContent {
                             Text(printer.printerProtocol == .act ? "ACT (TCP)" : "OctoPrint (HTTP)")
                                 .foregroundStyle(.secondary)
+                        } label: {
+                            Label("Protocol", systemImage: printer.printerProtocol.icon)
                         }
                     }
+                } header: {
+                    Label("Model", systemImage: "doc.zipper")
                 }
 
                 // Material profile selection
                 if !resinProfiles.isEmpty {
-                    Section("Material") {
+                    Section {
                         Picker("Resin Profile", selection: $selectedResinProfile) {
                             Text("None").tag(nil as ResinProfile?)
                             ForEach(resinProfiles) { profile in
@@ -122,21 +134,29 @@ struct PrintJobView: View {
 
                 // Print estimate from sliced metadata
                 if model.hasSlicedMetadata {
-                    Section("Print Estimate") {
+                    Section {
                         if let time = model.slicedPrintTimeSeconds, time > 0 {
-                            LabeledContent("Estimated Time") {
+                            LabeledContent {
                                 Text(formatDuration(Double(time)))
                                     .fontWeight(.medium)
+                            } label: {
+                                Label("Estimated Time", systemImage: "clock.fill")
                             }
                         }
 
                         if let layers = model.slicedLayerCount, layers > 0 {
-                            LabeledContent("Layers", value: "\(layers)")
+                            LabeledContent {
+                                Text("\(layers)")
+                            } label: {
+                                Label("Layers", systemImage: "square.stack.3d.up")
+                            }
                         }
 
                         if let volume = model.slicedVolumeMl, volume > 0 {
-                            LabeledContent("Resin Volume") {
+                            LabeledContent {
                                 Text(String(format: "%.1f mL", volume))
+                            } label: {
+                                Label("Resin Volume", systemImage: "drop.fill")
                             }
                         }
 
@@ -146,29 +166,41 @@ struct PrintJobView: View {
                                 let cost = Double(volume) * costPerMl
                                 let currency =
                                     UserDefaults.standard.string(forKey: "resinCurrency") ?? "USD"
-                                LabeledContent("Estimated Cost") {
+                                LabeledContent {
                                     Text(Self.formatCostLocal(cost, currency: currency))
                                         .fontWeight(.semibold)
                                         .foregroundStyle(.blue)
+                                } label: {
+                                    Label("Estimated Cost", systemImage: "dollarsign.circle.fill")
                                 }
                             }
                         }
 
                         if let height = model.slicedPrintHeight, height > 0 {
-                            LabeledContent("Print Height") {
+                            LabeledContent {
                                 Text(String(format: "%.1f mm", height))
+                            } label: {
+                                Label("Print Height", systemImage: "arrow.up.and.down")
                             }
                         }
 
                         if let layerH = model.slicedLayerHeight, layerH > 0 {
-                            LabeledContent("Layer Height") {
+                            LabeledContent {
                                 Text(String(format: "%.3f mm", layerH))
+                            } label: {
+                                Label("Layer Height", systemImage: "ruler")
                             }
                         }
 
                         if let exposure = model.slicedExposureTime, exposure > 0 {
-                            LabeledContent("Exposure", value: String(format: "%.1fs", exposure))
+                            LabeledContent {
+                                Text(String(format: "%.1fs", exposure))
+                            } label: {
+                                Label("Exposure", systemImage: "sun.max.fill")
+                            }
                         }
+                    } header: {
+                        Label("Print Estimate", systemImage: "chart.bar.doc.horizontal")
                     }
                 } else if !model.fileType.isSliced {
                     Section {
@@ -189,10 +221,12 @@ struct PrintJobView: View {
                 if model.hasDimensions, let x = model.dimensionX, let y = model.dimensionY,
                     let z = model.dimensionZ
                 {
-                    Section("Model Dimensions") {
-                        LabeledContent("Size") {
+                    Section {
+                        LabeledContent {
                             Text(String(format: "%.1f × %.1f × %.1f mm", x, y, z))
                                 .fontWeight(.medium)
+                        } label: {
+                            Label("Size", systemImage: "cube.transparent")
                         }
 
                         // Build plate fit visualization
@@ -213,6 +247,8 @@ struct PrintJobView: View {
                                 .padding(.vertical, 4)
                             }
                         }
+                    } header: {
+                        Label("Model Dimensions", systemImage: "ruler")
                     }
                 }
 

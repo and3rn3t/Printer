@@ -165,12 +165,16 @@ struct NewCollectionView: View {
     private let iconOptions = [
         "folder.fill", "star.fill", "heart.fill", "bookmark.fill",
         "tag.fill", "cube.fill", "paintbrush.fill", "wrench.fill",
-        "gearshape.fill", "bolt.fill", "flame.fill", "leaf.fill"
+        "gearshape.fill", "bolt.fill", "flame.fill", "leaf.fill",
+        "printer.fill", "shippingbox.fill", "trophy.fill", "puzzlepiece.fill",
+        "camera.fill", "sparkles", "crown.fill", "globe.americas.fill",
+        "wand.and.stars", "shield.fill", "flag.fill", "archivebox.fill"
     ]
 
     private let colorOptions = [
         "007AFF", "34C759", "FF3B30", "FF9500",
-        "AF52DE", "FF2D55", "5856D6", "00C7BE"
+        "AF52DE", "FF2D55", "5856D6", "00C7BE",
+        "8E8E93", "FFCC02", "30D158", "64D2FF"
     ]
 
     var body: some View {
@@ -268,12 +272,16 @@ struct EditCollectionView: View {
     private let iconOptions = [
         "folder.fill", "star.fill", "heart.fill", "bookmark.fill",
         "tag.fill", "cube.fill", "paintbrush.fill", "wrench.fill",
-        "gearshape.fill", "bolt.fill", "flame.fill", "leaf.fill"
+        "gearshape.fill", "bolt.fill", "flame.fill", "leaf.fill",
+        "printer.fill", "shippingbox.fill", "trophy.fill", "puzzlepiece.fill",
+        "camera.fill", "sparkles", "crown.fill", "globe.americas.fill",
+        "wand.and.stars", "shield.fill", "flag.fill", "archivebox.fill"
     ]
 
     private let colorOptions = [
         "007AFF", "34C759", "FF3B30", "FF9500",
-        "AF52DE", "FF2D55", "5856D6", "00C7BE"
+        "AF52DE", "FF2D55", "5856D6", "00C7BE",
+        "8E8E93", "FFCC02", "30D158", "64D2FF"
     ]
 
     init(collection: ModelCollection) {

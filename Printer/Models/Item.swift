@@ -71,6 +71,19 @@ enum ModelSortOption: String, CaseIterable, Identifiable, Sendable {
     case printCount = "Most Printed"
 
     var id: String { rawValue }
+
+    /// SF Symbol representing this sort option
+    var icon: String {
+        switch self {
+        case .dateNewest: return "calendar.badge.clock"
+        case .dateOldest: return "calendar"
+        case .nameAZ: return "textformat.abc"
+        case .nameZA: return "textformat.abc"
+        case .sizeLargest: return "arrow.up.square"
+        case .sizeSmallest: return "arrow.down.square"
+        case .printCount: return "printer.fill"
+        }
+    }
 }
 
 /// Available filter options for the model library
@@ -84,6 +97,19 @@ enum ModelFilterOption: String, CaseIterable, Identifiable, Sendable {
     case sliced = "Print Ready"
 
     var id: String { rawValue }
+
+    /// SF Symbol representing this filter
+    var icon: String {
+        switch self {
+        case .all: return "square.grid.2x2"
+        case .scanned: return "camera.fill"
+        case .imported: return "square.and.arrow.down.fill"
+        case .downloaded: return "arrow.down.circle.fill"
+        case .favorites: return "star.fill"
+        case .needsSlicing: return "scissors"
+        case .sliced: return "checkmark.seal.fill"
+        }
+    }
 }
 
 /// Represents a 3D model that can be printed

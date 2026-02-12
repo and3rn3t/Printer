@@ -117,11 +117,13 @@ struct SettingsView: View {
 
     private var printerSection: some View {
         Section {
-            Picker("Default Printer", selection: $defaultPrinterID) {
+            Picker(selection: $defaultPrinterID) {
                 Text("None").tag("")
                 ForEach(printers) { printer in
                     Text(printer.name).tag(printer.id.uuidString)
                 }
+            } label: {
+                Label("Default Printer", systemImage: "printer.fill")
             }
         } header: {
             Label("Printer", systemImage: "printer")
@@ -132,14 +134,20 @@ struct SettingsView: View {
 
     private var librarySection: some View {
         Section {
-            Picker("Default Sort", selection: $defaultSortOption) {
+            Picker(selection: $defaultSortOption) {
                 ForEach(ModelSortOption.allCases) { option in
                     Text(option.rawValue).tag(option.rawValue)
                 }
+            } label: {
+                Label("Default Sort", systemImage: "arrow.up.arrow.down")
             }
 
-            Toggle("Generate Thumbnails", isOn: $generateThumbnails)
-            Toggle("Confirm Before Deleting", isOn: $confirmBeforeDelete)
+            Toggle(isOn: $generateThumbnails) {
+                Label("Generate Thumbnails", systemImage: "photo")
+            }
+            Toggle(isOn: $confirmBeforeDelete) {
+                Label("Confirm Before Deleting", systemImage: "trash.circle")
+            }
         } header: {
             Label("Model Library", systemImage: "cube.transparent")
         } footer: {
@@ -152,15 +160,21 @@ struct SettingsView: View {
 
     private var printingSection: some View {
         Section {
-            Toggle("Show Slicing Warnings", isOn: $showSlicingWarnings)
+            Toggle(isOn: $showSlicingWarnings) {
+                Label("Show Slicing Warnings", systemImage: "exclamationmark.triangle")
+            }
 
-            Toggle("Auto-Delete Old Jobs", isOn: $autoDeleteCompletedJobs)
+            Toggle(isOn: $autoDeleteCompletedJobs) {
+                Label("Auto-Delete Old Jobs", systemImage: "trash.slash")
+            }
 
             if autoDeleteCompletedJobs {
                 Stepper("Keep for \(completedJobRetentionDays) days", value: $completedJobRetentionDays, in: 1...365)
             }
 
-            Toggle("Time-lapse Capture", isOn: $timelapseEnabled)
+            Toggle(isOn: $timelapseEnabled) {
+                Label("Time-lapse Capture", systemImage: "timelapse")
+            }
 
             if timelapseEnabled {
                 VStack(alignment: .leading) {
@@ -178,8 +192,10 @@ struct SettingsView: View {
 
     private var notificationsSection: some View {
         Section {
-            Toggle("Print Notifications", isOn: $enablePrintNotifications)
-                .onChange(of: enablePrintNotifications) { _, enabled in
+            Toggle(isOn: $enablePrintNotifications) {
+                Label("Print Notifications", systemImage: "bell.badge.fill")
+            }
+            .onChange(of: enablePrintNotifications) { _, enabled in
                     if enabled {
                         Task {
                             await PrintNotificationManager.shared.requestAuthorization()
@@ -265,25 +281,29 @@ struct SettingsView: View {
 
     private var iCloudSection: some View {
         Section {
-            Toggle("iCloud Sync", isOn: $enableICloudSync)
+            Toggle(isOn: $enableICloudSync) {
+                Label("iCloud Sync", systemImage: "icloud.fill")
+            }
 
             if enableICloudSync {
                 HStack {
-                    Text("Status")
+                    Label("Status", systemImage: "antenna.radiowaves.left.and.right")
                     Spacer()
                     Text(iCloudSyncStatus)
                         .foregroundStyle(.secondary)
                 }
 
                 HStack {
-                    Text("Synced Files")
+                    Label("Synced Files", systemImage: "doc.on.doc")
                     Spacer()
                     Text("\(iCloudFileCount)")
                         .foregroundStyle(.secondary)
                 }
 
-                Button("Refresh Sync Status") {
+                Button {
                     Task { await refreshICloudStatus() }
+                } label: {
+                    Label("Refresh Sync Status", systemImage: "arrow.clockwise")
                 }
             }
         } header: {
@@ -304,28 +324,30 @@ struct SettingsView: View {
     private var storageSection: some View {
         Section {
             HStack {
-                Text("Models")
+                Label("Models", systemImage: "cube.transparent")
                 Spacer()
                 Text("\(models.count)")
                     .foregroundStyle(.secondary)
             }
 
             HStack {
-                Text("Print Jobs")
+                Label("Print Jobs", systemImage: "printer.fill")
                 Spacer()
                 Text("\(printJobs.count)")
                     .foregroundStyle(.secondary)
             }
 
             HStack {
-                Text("Storage Used")
+                Label("Storage Used", systemImage: "externaldrive.fill")
                 Spacer()
                 Text(storageUsed)
                     .foregroundStyle(.secondary)
             }
 
-            Button("Clear Thumbnail Cache") {
+            Button {
                 showingClearCacheConfirm = true
+            } label: {
+                Label("Clear Thumbnail Cache", systemImage: "photo.circle")
             }
 
             // Re-scan sliced files for metadata and thumbnails
@@ -382,13 +404,17 @@ struct SettingsView: View {
 
     private var dataSection: some View {
         Section {
-            Button("Clear Print History", role: .destructive) {
+            Button(role: .destructive) {
                 showingClearHistoryConfirm = true
+            } label: {
+                Label("Clear Print History", systemImage: "clock.arrow.circlepath")
             }
             .disabled(printJobs.isEmpty)
 
-            Button("Delete All Models", role: .destructive) {
+            Button(role: .destructive) {
                 showingDeleteAllConfirm = true
+            } label: {
+                Label("Delete All Models", systemImage: "trash.fill")
             }
             .disabled(models.isEmpty)
         } header: {
@@ -401,14 +427,14 @@ struct SettingsView: View {
     private var aboutSection: some View {
         Section {
             HStack {
-                Text("Version")
+                Label("Version", systemImage: "number")
                 Spacer()
                 Text(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0")
                     .foregroundStyle(.secondary)
             }
 
             HStack {
-                Text("Build")
+                Label("Build", systemImage: "hammer")
                 Spacer()
                 Text(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1")
                     .foregroundStyle(.secondary)
