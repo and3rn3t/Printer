@@ -30,6 +30,11 @@ struct PrinterDetailView: View {
             .map { $0 }
     }
 
+    /// Maintenance alerts for this printer
+    private var maintenanceAlerts: [MaintenanceScheduler.MaintenanceAlert] {
+        MaintenanceScheduler.alertsForPrinter(printer)
+    }
+
     var body: some View {
         List {
             // Connection banner
@@ -136,6 +141,33 @@ struct PrinterDetailView: View {
 
             // Connection details
             connectionDetailsSection
+
+            // Maintenance alerts banner
+            if !maintenanceAlerts.isEmpty {
+                Section {
+                    ForEach(maintenanceAlerts) { alert in
+                        HStack(spacing: 10) {
+                            Image(systemName: alert.type.icon)
+                                .foregroundStyle(alert.isOverdue ? .red : .orange)
+                                .frame(width: 24)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(alert.type.rawValue)
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                                Text(alert.displayText)
+                                    .font(.caption)
+                                    .foregroundStyle(alert.isOverdue ? .red : .orange)
+                            }
+                            Spacer()
+                            Image(systemName: alert.isOverdue ? "exclamationmark.circle.fill" : "clock.badge.exclamationmark")
+                                .foregroundStyle(alert.isOverdue ? .red : .orange)
+                        }
+                    }
+                } header: {
+                    Label("Maintenance Due", systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                }
+            }
 
             // Maintenance
             Section {

@@ -64,6 +64,8 @@ struct PrinterApp: App {
                     }
                     // Schedule background print monitoring
                     BackgroundPrintMonitor.shared.scheduleBackgroundRefresh()
+                    // Check for overdue maintenance
+                    checkMaintenanceAlerts()
                 }
         }
         .modelContainer(sharedModelContainer)
@@ -109,6 +111,19 @@ struct PrinterApp: App {
             WidgetCenter.shared.reloadAllTimelines()
         } catch {
             // Non-fatal — widget data will be stale
+        }
+    }
+
+    // MARK: - Maintenance Checks
+
+    /// Check for overdue maintenance and send notifications.
+    private func checkMaintenanceAlerts() {
+        let context = sharedModelContainer.mainContext
+        do {
+            let printers = try context.fetch(FetchDescriptor<Printer>())
+            MaintenanceScheduler.checkAndNotify(printers: printers)
+        } catch {
+            // Non-fatal
         }
     }
 

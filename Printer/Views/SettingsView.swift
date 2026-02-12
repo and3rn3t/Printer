@@ -29,6 +29,7 @@ struct SettingsView: View {
     @AppStorage("enablePrintNotifications") private var enablePrintNotifications = true
     @AppStorage("resinCostPerMl") private var resinCostPerMl: Double = 0.0
     @AppStorage("resinCurrency") private var resinCurrency: String = "USD"
+    @AppStorage("monthlyBudget") private var monthlyBudget: Double = 0.0
     @AppStorage("enableICloudSync") private var enableICloudSync = false
 
     // MARK: State
@@ -204,10 +205,27 @@ struct SettingsView: View {
                 Text("AUD (A$)").tag("AUD")
                 Text("JPY (\u{00A5})").tag("JPY")
             }
+
+            HStack {
+                Text("Monthly Budget")
+                Spacer()
+                TextField("0.00", value: $monthlyBudget, format: .number.precision(.fractionLength(2)))
+                    .multilineTextAlignment(.trailing)
+                    .frame(width: 80)
+                    #if os(iOS)
+                    .keyboardType(.decimalPad)
+                    #endif
+            }
+
+            NavigationLink {
+                CostAnalyticsView()
+            } label: {
+                Label("Cost Analytics", systemImage: "chart.pie")
+            }
         } header: {
             Label("Cost Tracking", systemImage: "dollarsign.circle")
         } footer: {
-            Text("Set your resin cost per milliliter to see estimated costs on print jobs and statistics.")
+            Text("Set your resin cost per milliliter to see estimated costs. Set a monthly budget to track spending.")
         }
     }
 

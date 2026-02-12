@@ -52,6 +52,11 @@ struct DashboardView: View {
         }
     }
 
+    /// Maintenance alerts across all printers
+    private var maintenanceAlerts: [MaintenanceScheduler.MaintenanceAlert] {
+        MaintenanceScheduler.computeAlerts(printers: printers)
+    }
+
     var body: some View {
         ScrollView {
             VStack(spacing: 24) {
@@ -96,6 +101,44 @@ struct DashboardView: View {
                     }
                 }
 
+                // Maintenance alerts
+                if !maintenanceAlerts.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Label("Maintenance Due", systemImage: "exclamationmark.triangle.fill")
+                            .font(.headline)
+                            .foregroundStyle(.orange)
+                            .padding(.horizontal)
+
+                        VStack(spacing: 6) {
+                            ForEach(maintenanceAlerts.prefix(3)) { alert in
+                                HStack(spacing: 10) {
+                                    Image(systemName: alert.type.icon)
+                                        .foregroundStyle(alert.isOverdue ? .red : .orange)
+                                        .frame(width: 24)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(alert.type.rawValue)
+                                            .font(.subheadline)
+                                            .fontWeight(.medium)
+                                        Text(alert.printerName)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    Spacer()
+                                    Text(alert.displayText)
+                                        .font(.caption)
+                                        .fontWeight(.medium)
+                                        .foregroundStyle(alert.isOverdue ? .red : .orange)
+                                }
+                                .padding(.horizontal)
+                            }
+                        }
+                        .padding(.vertical, 8)
+                        .background(Color.orange.opacity(0.06))
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .padding(.horizontal)
+                    }
+                }
+
                 // Quick stats
                 VStack(alignment: .leading, spacing: 12) {
                     Label("Quick Stats", systemImage: "chart.bar.fill")
@@ -123,6 +166,17 @@ struct DashboardView: View {
                         )
                     }
                     .padding(.horizontal)
+
+                    // Cost summary card
+                    if totalSpendThisMonth > 0 || monthlyBudget > 0 {
+                        NavigationLink {
+                            CostAnalyticsView()
+                        } label: {
+                            costSummaryRow
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.horizontal)
+                    }
                 }
 
                 // Recent activity
@@ -365,6 +419,65 @@ struct DashboardView: View {
             return "\(h)h \(m)m left"
         }
         return "\(m)m left"
+    }
+
+    // MARK: - Cost Summary
+
+    @AppStorage("resinCostPerMl") private var resinCostPerMl: Double = 0.0
+    @AppStorage("resinCurrency") private var resinCurrency: String = "USD"
+    @AppStorage("monthlyBudget") private var monthlyBudget: Double = 0.0
+
+    private var totalSpendThisMonth: Double {
+        let cal = Calendar.current
+        let start = cal.date(from: cal.dateComponents([.year, .month], from: Date()))!
+        guard resinCostPerMl > 0 else { return 0 }
+        return allJobs
+            .filter { $0.status == .completed && $0.startDate >= start }
+            .reduce(0) { sum, job in
+                let vol = Double(job.model?.slicedVolumeMl ?? 0)
+                return sum + vol * resinCostPerMl
+            }
+    }
+
+    private var costCurrencySymbol: String {
+        switch resinCurrency {
+        case "EUR": return "\u{20AC}"
+        case "GBP": return "\u{00A3}"
+        case "JPY": return "\u{00A5}"
+        case "CAD": return "CA$"
+        case "AUD": return "A$"
+        default: return "$"
+        }
+    }
+
+    @ViewBuilder
+    private var costSummaryRow: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "dollarsign.circle.fill")
+                .font(.title3)
+                .foregroundStyle(.green)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("This Month: \(costCurrencySymbol)\(String(format: "%.2f", totalSpendThisMonth))")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                if monthlyBudget > 0 {
+                    let remaining = monthlyBudget - totalSpendThisMonth
+                    Text(remaining >= 0 ? "\(costCurrencySymbol)\(String(format: "%.2f", remaining)) remaining" : "Over budget!")
+                        .font(.caption)
+                        .foregroundStyle(remaining >= 0 ? .green : .red)
+                }
+            }
+
+            Spacer()
+
+            Image(systemName: "chevron.right")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .padding(12)
+        .background(Color.gray.opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
     }
 
     private var successRate: String {

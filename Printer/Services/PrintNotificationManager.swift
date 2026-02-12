@@ -195,6 +195,24 @@ final class PrintNotificationManager: @unchecked Sendable {
         UNUserNotificationCenter.current().add(request)
     }
 
+    /// Notify when a maintenance task is overdue for a printer.
+    func notifyMaintenanceDue(type: String, printerName: String, daysOverdue: Int) {
+        guard UserDefaults.standard.bool(forKey: "enablePrintNotifications") else { return }
+
+        let content = UNMutableNotificationContent()
+        content.title = "Maintenance Overdue"
+        content.body = "\(type) for \(printerName) is \(daysOverdue) day\(daysOverdue == 1 ? "" : "s") overdue"
+        content.sound = .default
+        content.threadIdentifier = "maintenance"
+
+        let request = UNNotificationRequest(
+            identifier: "maintenance-\(printerName)-\(type)",
+            content: content,
+            trigger: nil
+        )
+        UNUserNotificationCenter.current().add(request)
+    }
+
     // MARK: - Helpers
 
     private static func formatDuration(_ seconds: TimeInterval) -> String {
