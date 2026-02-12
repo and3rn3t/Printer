@@ -235,7 +235,8 @@ struct PhotoLogBadge: View {
     let count: Int
 
     var body: some View {
-        if !isEmpty {
+        // swiftlint:disable:next empty_count
+        if count > 0 {
             HStack(spacing: 3) {
                 Image(systemName: "camera.fill")
                     .font(.caption2)

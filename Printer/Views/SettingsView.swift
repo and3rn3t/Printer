@@ -604,4 +604,9 @@ struct SettingsView: View {
     let config = ModelConfiguration(isStoredInMemoryOnly: true)
     // swiftlint:disable:next force_try
     let container = try! ModelContainer(
+        for: PrintModel.self, PrintJob.self, Printer.self, configurations: config
+    )
+
+    return SettingsView()
+        .modelContainer(container)
 }

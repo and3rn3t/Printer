@@ -41,7 +41,8 @@ actor ModelConverter {
         let asset = MDLAsset(url: usdzURL)
 
         // Get all meshes from the asset
-        guard !asset.isEmpty else {
+        // swiftlint:disable:next empty_count
+        guard asset.count > 0 else {
             throw ConversionError.conversionFailed
         }
 
@@ -64,7 +65,8 @@ actor ModelConverter {
 
         let asset = MDLAsset(url: objURL)
 
-        guard !asset.isEmpty else {
+        // swiftlint:disable:next empty_count
+        guard asset.count > 0 else {
             throw ConversionError.conversionFailed
         }
 
