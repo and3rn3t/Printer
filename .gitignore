@@ -21,6 +21,8 @@ Package.resolved
 !.vscode/tasks.json
 !.vscode/launch.json
 !.vscode/extensions.json
+!.vscode/swift.code-snippets
+!.vscode/.swift-format
 
 # Build artifacts
 *.ipa

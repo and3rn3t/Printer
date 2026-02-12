@@ -8,7 +8,15 @@
         "editor.rulers": [120],
         "editor.suggest.snippetsPreventQuickSuggestions": false,
         "editor.bracketPairColorization.enabled": true,
-        "editor.guides.bracketPairs": "active"
+        "editor.guides.bracketPairs": "active",
+        "editor.quickSuggestions": {
+            "other": true,
+            "comments": false,
+            "strings": false
+        },
+        "editor.codeActionsOnSave": {
+            "source.organizeImports": "explicit"
+        }
     },
 
     // File associations
@@ -19,7 +27,9 @@
         "*.pbxproj": "plaintext",
         "*.storyboard": "xml",
         "*.xib": "xml",
-        "*.xcscheme": "xml"
+        "*.xcscheme": "xml",
+        "*.strings": "xml",
+        "*.xcconfig": "properties"
     },
 
     // Exclude build artifacts, Xcode noise, and separate targets from explorer/search
@@ -28,30 +38,43 @@
         "**/DerivedData": true,
         "**/*.xcodeproj/xcuserdata": true,
         "**/*.xcworkspace/xcuserdata": true,
-        "**/.build": true,
-        "widget": true
+        "**/.build": true
     },
     "search.exclude": {
         "**/DerivedData": true,
         "**/*.xcodeproj/project.pbxproj": true,
-        "**/.build": true
+        "**/.build": true,
+        "**/*.xcodeproj/project.xcworkspace": true
     },
 
     // Swift sourcekit-lsp (provided by the Swift extension)
     "swift.sourcekit-lsp.serverArguments": [],
 
+    // SweetPad settings
+    "sweetpad.build.xcbeautifyEnabled": true,
+
     // Trim trailing whitespace
     "files.trimTrailingWhitespace": true,
     "files.insertFinalNewline": true,
+    "files.trimFinalNewlines": true,
 
     // Editor enhancements for Swift
     "editor.minimap.enabled": false,
     "editor.stickyScroll.enabled": true,
     "editor.inlayHints.enabled": "onUnlessPressed",
     "editor.wordWrap": "off",
+    "editor.linkedEditing": true,
+    "editor.renderWhitespace": "trailing",
+
+    // Breadcrumbs for navigating MARK: sections
+    "breadcrumbs.enabled": true,
+    "breadcrumbs.symbolPath": "on",
+    "outline.showVariables": true,
 
     // Terminal profile for builds
     "terminal.integrated.defaultProfile.osx": "zsh",
+    "terminal.integrated.scrollback": 10000,
+    "terminal.integrated.enablePersistentSessions": false,
 
     // File nesting (group related files in explorer)
     "explorer.fileNesting.enabled": true,
@@ -59,5 +82,19 @@
         "*.swift": "${capture}.generated.swift",
         "*.xcodeproj": "*.xcworkspace, buildServer.json",
         "Info.plist": "*.entitlements, *.plist"
-    }
+    },
+
+    // Explorer sorting: keep folders first, alphabetical
+    "explorer.sortOrder": "type",
+
+    // Auto-save after a short delay (pairs well with format-on-save)
+    "files.autoSave": "afterDelay",
+    "files.autoSaveDelay": 2000,
+
+    // Diff editor
+    "diffEditor.ignoreTrimWhitespace": true,
+
+    // Git
+    "git.autofetch": true,
+    "git.confirmSync": false
 }

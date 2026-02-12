@@ -1,0 +1,322 @@
+{
+    // SwiftUI snippet
+    "SwiftUI View": {
+        "prefix": "swiftui-view",
+        "body": [
+            "import SwiftUI",
+            "",
+            "struct ${1:ViewName}: View {",
+            "    var body: some View {",
+            "        ${2:Text(\"Hello, World!\")}",
+            "    }",
+            "}",
+            "",
+            "#Preview {",
+            "    ${1:ViewName}()",
+            "}"
+        ],
+        "description": "SwiftUI View with preview"
+    },
+
+    // Observable class
+    "Observable Class": {
+        "prefix": "observable",
+        "body": [
+            "import SwiftUI",
+            "",
+            "@Observable",
+            "class ${1:ClassName} {",
+            "    var ${2:property}: ${3:String} = ${4:\"\"}",
+            "}"
+        ],
+        "description": "Observable class (Observation framework)"
+    },
+
+    // SwiftData model
+    "SwiftData Model": {
+        "prefix": "swiftdata-model",
+        "body": [
+            "import SwiftData",
+            "",
+            "@Model",
+            "final class ${1:ModelName} {",
+            "    var ${2:property}: ${3:String}",
+            "",
+            "    init(${2:property}: ${3:String}) {",
+            "        self.${2:property} = ${2:property}",
+            "    }",
+            "}"
+        ],
+        "description": "SwiftData model class"
+    },
+
+    // Async function
+    "Async Function": {
+        "prefix": "async-func",
+        "body": [
+            "func ${1:functionName}() async throws -> ${2:Void} {",
+            "    ${3:// implementation}",
+            "}"
+        ],
+        "description": "Async throwing function"
+    },
+
+    // MARK comment
+    "MARK Comment": {
+        "prefix": "mark",
+        "body": "// MARK: - ${1:Section Name}",
+        "description": "MARK section divider"
+    },
+
+    // Guard let
+    "Guard Let": {
+        "prefix": "guardlet",
+        "body": [
+            "guard let ${1:value} = ${2:optional} else {",
+            "    ${3:return}",
+            "}"
+        ],
+        "description": "Guard let unwrap"
+    },
+
+    // Task
+    "Task Block": {
+        "prefix": "task-block",
+        "body": [
+            ".task {",
+            "    ${1:await doSomething()}",
+            "}"
+        ],
+        "description": "SwiftUI .task modifier"
+    },
+
+    // Sheet modifier
+    "Sheet Modifier": {
+        "prefix": "sheet",
+        "body": [
+            ".sheet(isPresented: \\$${1:isPresented}) {",
+            "    ${2:SheetView()}",
+            "}"
+        ],
+        "description": "SwiftUI sheet presentation"
+    },
+
+    // Swift Actor
+    "Swift Actor": {
+        "prefix": "actor",
+        "body": [
+            "actor ${1:ActorName} {",
+            "    ",
+            "    // MARK: - Properties",
+            "    ",
+            "    private var ${2:property}: ${3:String}",
+            "    ",
+            "    // MARK: - Init",
+            "    ",
+            "    init(${2:property}: ${3:String}) {",
+            "        self.${2:property} = ${2:property}",
+            "    }",
+            "    ",
+            "    // MARK: - Methods",
+            "    ",
+            "    func ${4:doWork}() async throws {",
+            "        ${5:// implementation}",
+            "    }",
+            "}"
+        ],
+        "description": "Swift Actor with MARK sections"
+    },
+
+    // NavigationSplitView
+    "NavigationSplitView": {
+        "prefix": "navsplit",
+        "body": [
+            "NavigationSplitView {",
+            "    ${1:// Sidebar}",
+            "    List(selection: \\$${2:selection}) {",
+            "        ${3:// List content}",
+            "    }",
+            "} detail: {",
+            "    ${4:Text(\"Select an item\")}",
+            "}"
+        ],
+        "description": "NavigationSplitView with sidebar and detail"
+    },
+
+    // Environment query
+    "Environment Query": {
+        "prefix": "env-query",
+        "body": [
+            "@Environment(\\.${1:modelContext}) private var ${2:modelContext}"
+        ],
+        "description": "@Environment property wrapper"
+    },
+
+    // SwiftData Query
+    "SwiftData Query": {
+        "prefix": "query",
+        "body": [
+            "@Query(sort: \\\\${1:ModelName}.${2:name}) private var ${3:items}: [${1:ModelName}]"
+        ],
+        "description": "@Query with sort descriptor"
+    },
+
+    // Alert modifier
+    "Alert Modifier": {
+        "prefix": "alert",
+        "body": [
+            ".alert(\"${1:Title}\", isPresented: \\$${2:showAlert}) {",
+            "    Button(\"OK\", role: .cancel) { }",
+            "} message: {",
+            "    Text(${3:errorMessage})",
+            "}"
+        ],
+        "description": "SwiftUI alert modifier with message"
+    },
+
+    // Do-catch with error alert
+    "Do Catch Alert": {
+        "prefix": "do-catch-alert",
+        "body": [
+            "do {",
+            "    ${1:try await someOperation()}",
+            "} catch {",
+            "    errorMessage = error.localizedDescription",
+            "    showError = true",
+            "}"
+        ],
+        "description": "Do-catch that sets error alert state"
+    },
+
+    // Toolbar content
+    "Toolbar": {
+        "prefix": "toolbar",
+        "body": [
+            ".toolbar {",
+            "    ToolbarItem(placement: .${1:primaryAction}) {",
+            "        Button {",
+            "            ${2:// action}",
+            "        } label: {",
+            "            Label(\"${3:Title}\", systemImage: \"${4:plus}\")",
+            "        }",
+            "    }",
+            "}"
+        ],
+        "description": "Toolbar with ToolbarItem"
+    },
+
+    // LocalizedError enum
+    "Error Enum": {
+        "prefix": "error-enum",
+        "body": [
+            "enum ${1:ServiceError}: LocalizedError {",
+            "    case ${2:networkUnavailable}",
+            "    case ${3:invalidResponse}",
+            "    ",
+            "    var errorDescription: String? {",
+            "        switch self {",
+            "        case .${2:networkUnavailable}:",
+            "            \"${4:Network is unavailable}\"",
+            "        case .${3:invalidResponse}:",
+            "            \"${5:Invalid response received}\"",
+            "        }",
+            "    }",
+            "}"
+        ],
+        "description": "LocalizedError-conforming enum"
+    },
+
+    // Confirmation dialog
+    "Confirmation Dialog": {
+        "prefix": "confirm",
+        "body": [
+            ".confirmationDialog(",
+            "    \"${1:Are you sure?}\",",
+            "    isPresented: \\$${2:showConfirmation},",
+            "    titleVisibility: .visible",
+            ") {",
+            "    Button(\"${3:Delete}\", role: .destructive) {",
+            "        ${4:// action}",
+            "    }",
+            "}"
+        ],
+        "description": "Confirmation dialog modifier"
+    },
+
+    // os.Logger
+    "Logger": {
+        "prefix": "logger",
+        "body": [
+            "private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? \"com.printer\", category: \"${1:CategoryName}\")"
+        ],
+        "description": "os.Logger instance"
+    },
+
+    // #if os() guard
+    "Platform Guard": {
+        "prefix": "ifos",
+        "body": [
+            "#if os(${1|iOS,macOS,visionOS|})",
+            "${2:// platform-specific code}",
+            "#endif"
+        ],
+        "description": "#if os() platform guard"
+    },
+
+    // State and binding pair
+    "State Property": {
+        "prefix": "state",
+        "body": "@State private var ${1:propertyName}: ${2:Bool} = ${3:false}",
+        "description": "@State property"
+    },
+
+    // Async task with loading state
+    "Async Load Pattern": {
+        "prefix": "async-load",
+        "body": [
+            "@State private var isLoading = false",
+            "@State private var errorMessage: String?",
+            "@State private var showError = false",
+            "",
+            "private func ${1:loadData}() async {",
+            "    isLoading = true",
+            "    defer { isLoading = false }",
+            "    ",
+            "    do {",
+            "        ${2:// load data}",
+            "    } catch {",
+            "        errorMessage = error.localizedDescription",
+            "        showError = true",
+            "    }",
+            "}"
+        ],
+        "description": "Async loading with error handling pattern"
+    },
+
+    // SwiftUI Section
+    "Section": {
+        "prefix": "section",
+        "body": [
+            "Section {",
+            "    ${2:// content}",
+            "} header: {",
+            "    Text(\"${1:Header}\")",
+            "}"
+        ],
+        "description": "List Section with header"
+    },
+
+    // File header
+    "File Header": {
+        "prefix": "fileheader",
+        "body": [
+            "//",
+            "//  ${TM_FILENAME}",
+            "//  Printer",
+            "//",
+            "//  Created on ${CURRENT_YEAR}-${CURRENT_MONTH}-${CURRENT_DATE}.",
+            "//"
+        ],
+        "description": "Standard Apple-style file header"
+    }
+}

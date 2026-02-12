@@ -1,6 +1,8 @@
 {
     "recommendations": [
         "swiftlang.swift-vscode",
-        "alishobeiri.swift-development"
+        "sweetpad.sweetpad",
+        "mariomatheu.syntax-project-pbxproj",
+        "mhcpnl.xcodestrings"
     ]
 }

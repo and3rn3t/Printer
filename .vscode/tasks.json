@@ -4,12 +4,7 @@
         {
             "label": "Build (xcodebuild)",
             "type": "shell",
-            "command": "xcodebuild",
-            "args": [
-                "-project", "Printer.xcodeproj",
-                "-scheme", "Printer",
-                "build"
-            ],
+            "command": "xcodebuild -project Printer.xcodeproj -scheme Printer build 2>&1 | xcbeautify --disable-colored-output",
             "group": {
                 "kind": "build",
                 "isDefault": true
@@ -24,12 +19,7 @@
         {
             "label": "Clean Build (xcodebuild)",
             "type": "shell",
-            "command": "xcodebuild",
-            "args": [
-                "-project", "Printer.xcodeproj",
-                "-scheme", "Printer",
-                "clean", "build"
-            ],
+            "command": "xcodebuild -project Printer.xcodeproj -scheme Printer clean build 2>&1 | xcbeautify --disable-colored-output",
             "problemMatcher": ["$xcodebuild"],
             "presentation": {
                 "reveal": "always",
@@ -40,17 +30,78 @@
         {
             "label": "Run Tests (xcodebuild)",
             "type": "shell",
-            "command": "xcodebuild",
-            "args": [
-                "-project", "Printer.xcodeproj",
-                "-scheme", "Printer",
-                "test"
-            ],
+            "command": "xcodebuild -project Printer.xcodeproj -scheme Printer test -destination 'platform=iOS Simulator,name=iPhone 16' 2>&1 | xcbeautify --disable-colored-output",
             "group": {
                 "kind": "test",
                 "isDefault": true
             },
             "problemMatcher": ["$xcodebuild"],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "clear": true
+            }
+        },
+        {
+            "label": "Build for Testing",
+            "type": "shell",
+            "command": "xcodebuild -project Printer.xcodeproj -scheme Printer build-for-testing -destination 'platform=iOS Simulator,name=iPhone 16' 2>&1 | xcbeautify --disable-colored-output",
+            "problemMatcher": ["$xcodebuild"],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "clear": true
+            }
+        },
+        {
+            "label": "Lint (SwiftLint)",
+            "type": "shell",
+            "command": "swiftlint lint --config .swiftlint.yml --reporter emoji",
+            "problemMatcher": {
+                "owner": "swiftlint",
+                "fileLocation": "absolute",
+                "pattern": {
+                    "regexp": "^(.+):(\\d+):(\\d+):\\s+(warning|error):\\s+(.+)$",
+                    "file": 1,
+                    "line": 2,
+                    "column": 3,
+                    "severity": 4,
+                    "message": 5
+                }
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "clear": true
+            }
+        },
+        {
+            "label": "Lint Fix (SwiftLint autocorrect)",
+            "type": "shell",
+            "command": "swiftlint lint --fix --config .swiftlint.yml",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "clear": true
+            }
+        },
+        {
+            "label": "Archive (Release)",
+            "type": "shell",
+            "command": "xcodebuild -project Printer.xcodeproj -scheme Printer -configuration Release archive -archivePath build/Printer.xcarchive 2>&1 | xcbeautify --disable-colored-output",
+            "problemMatcher": ["$xcodebuild"],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "clear": true
+            }
+        },
+        {
+            "label": "Show Build Settings",
+            "type": "shell",
+            "command": "xcodebuild -project Printer.xcodeproj -scheme Printer -showBuildSettings | head -80",
+            "problemMatcher": [],
             "presentation": {
                 "reveal": "always",
                 "panel": "dedicated",

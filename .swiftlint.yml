@@ -1,0 +1,129 @@
+# SwiftLint Configuration for Printer App
+
+# Paths
+included:
+  - Printer
+  - widget
+
+excluded:
+  - DerivedData
+  - .build
+  - Pods
+  - Carthage
+  - PrinterTests
+  - PrinterUITests
+
+# Enabled opt-in rules
+opt_in_rules:
+  - closure_end_indentation
+  - closure_spacing
+  - collection_alignment
+  - contains_over_filter_count
+  - contains_over_first_not_nil
+  - contains_over_range_nil_comparison
+  - discouraged_object_literal
+  - empty_collection_literal
+  - empty_count
+  - empty_string
+  - enum_case_associated_values_count
+  - fatal_error_message
+  - first_where
+  - flatmap_over_map_reduce
+  - force_unwrapping
+  - identical_operands
+  - implicit_return
+  - joined_default_parameter
+  - last_where
+  - literal_expression_end_indentation
+  - modifier_order
+  - multiline_arguments
+  - multiline_function_chains
+  - multiline_parameters
+  - operator_usage_whitespace
+  - overridden_super_call
+  - prefer_self_in_static_references
+  - prefer_self_type_over_type_of_self
+  - prefer_zero_over_explicit_init
+  - redundant_nil_coalescing
+  - redundant_type_annotation
+  - sorted_first_last
+  - toggle_bool
+  - trailing_closure
+  - unneeded_parentheses_in_closure_argument
+  - vertical_parameter_alignment_on_call
+  - yoda_condition
+
+# Disabled rules
+disabled_rules:
+  - trailing_comma            # Conflicts with swift-format
+  - opening_brace             # Conflicts with swift-format
+  - todo                      # Allow TODO/FIXME comments during development
+  - type_body_length          # Some views are legitimately long
+  - file_length               # Some files need to be large (Item.swift)
+  - function_body_length      # Complex printer protocol functions
+
+# Rule configurations
+line_length:
+  warning: 120
+  error: 200
+  ignores_urls: true
+  ignores_comments: true
+  ignores_function_declarations: false
+
+type_name:
+  min_length:
+    warning: 3
+    error: 0
+  max_length:
+    warning: 50
+    error: 60
+
+identifier_name:
+  min_length:
+    warning: 2
+    error: 1
+  max_length:
+    warning: 50
+    error: 60
+  excluded:
+    - id
+    - ip
+    - x
+    - y
+    - z
+    - i
+    - to
+    - at
+
+function_parameter_count:
+  warning: 6
+  error: 10
+
+large_tuple:
+  warning: 3
+  error: 4
+
+cyclomatic_complexity:
+  warning: 15
+  error: 25
+
+nesting:
+  type_level:
+    warning: 3
+  function_level:
+    warning: 5
+
+# Custom rules
+custom_rules:
+  no_system_gray6:
+    name: "No systemGray6"
+    regex: 'Color\(\.systemGray6\)'
+    message: "Use Color.gray.opacity(0.15) instead of Color(.systemGray6) for cross-platform compatibility"
+    severity: error
+  no_print_statements:
+    name: "No print() in production"
+    regex: '^\s*print\('
+    message: "Use os.Logger or structured logging instead of print()"
+    severity: warning
+    match_kinds:
+      - identifier
