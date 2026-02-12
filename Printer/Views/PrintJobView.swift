@@ -178,23 +178,22 @@ struct PrintJobView: View {
                                 .fontWeight(.medium)
                         }
 
-                        // Build plate fit check
+                        // Build plate fit visualization
                         if let printer = selectedPrinter {
                             let bpX = printer.buildPlateX ?? 0
                             let bpY = printer.buildPlateY ?? 0
                             let bpZ = printer.buildPlateZ ?? 0
                             if bpX > 0 && bpY > 0 && bpZ > 0 {
-                                let fits = x <= bpX && y <= bpY && z <= bpZ
-                                HStack {
-                                    Image(systemName: fits ? "checkmark.seal.fill" : "exclamationmark.triangle.fill")
-                                        .foregroundStyle(fits ? .green : .orange)
-                                    Text(fits ? "Fits on build plate" : "May exceed build plate")
-                                        .font(.subheadline)
-                                    Spacer()
-                                    Text(String(format: "%.0f × %.0f × %.0f mm", bpX, bpY, bpZ))
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
+                                BuildPlateView(
+                                    plateX: bpX,
+                                    plateY: bpY,
+                                    plateZ: bpZ,
+                                    modelX: x,
+                                    modelY: y,
+                                    modelZ: z,
+                                    isResinPrinter: printer.printerProtocol == .act
+                                )
+                                .padding(.vertical, 4)
                             }
                         }
                     }

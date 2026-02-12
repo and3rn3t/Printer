@@ -20,6 +20,7 @@ struct PrinterDetailView: View {
     @State private var showingControlError = false
     @State private var showingEditPrinter = false
     @State private var webcamURL: URL?
+    @State private var tempHistory = TemperatureHistoryManager()
 
     /// Recent jobs for this printer
     private var recentJobs: [PrintJob] {
@@ -54,6 +55,32 @@ struct PrinterDetailView: View {
             if let webcamURL {
                 Section("Camera") {
                     WebcamStreamView(snapshotURL: webcamURL, refreshInterval: 2.0)
+                }
+            }
+
+            // Time-lapse photo log link (when active job has snapshots)
+            if let activeJob = manager.activeJob {
+                Section("Time-lapse") {
+                    NavigationLink {
+                        PhotoLogView(printJob: activeJob)
+                    } label: {
+                        Label("View Photo Log", systemImage: "camera.fill")
+                    }
+                }
+            }
+
+            // Temperature monitoring (HTTP printers with temp data)
+            if printer.printerProtocol != .act,
+               manager.connectionState.isConnected,
+               manager.printerStatus?.temperature != nil {
+                Section("Temperature") {
+                    TemperatureChartView(
+                        readings: tempHistory.readings,
+                        currentBedTemp: manager.printerStatus?.temperature?.bed?.actual,
+                        currentBedTarget: manager.printerStatus?.temperature?.bed?.target,
+                        currentToolTemp: manager.printerStatus?.temperature?.tool0?.actual,
+                        currentToolTarget: manager.printerStatus?.temperature?.tool0?.target
+                    )
                 }
             }
 
@@ -134,9 +161,13 @@ struct PrinterDetailView: View {
         }
         .refreshable {
             await manager.refresh()
+            recordTemperature()
         }
         .animation(.easeInOut(duration: 0.3), value: manager.connectionState.isConnected)
         .animation(.easeInOut(duration: 0.3), value: manager.photonStatus?.displayText)
+        .onChange(of: manager.lastUpdated) { _, _ in
+            recordTemperature()
+        }
         .onAppear {
             manager.modelContext = modelContext
             manager.startMonitoring(printer)
@@ -413,6 +444,19 @@ struct PrinterDetailView: View {
                 .foregroundStyle(.secondary)
             }
 
+            // ETA countdown
+            if let remaining = manager.estimatedTimeRemaining, remaining > 0 {
+                LabeledContent("ETA") {
+                    HStack(spacing: 6) {
+                        Image(systemName: "clock.badge.checkmark")
+                            .foregroundStyle(.green)
+                        Text(Date().addingTimeInterval(Double(remaining)).formatted(date: .omitted, time: .shortened))
+                            .fontWeight(.semibold)
+                            .foregroundStyle(.green)
+                    }
+                }
+            }
+
             if manager.photonStatus == .paused {
                 Label("Print is paused — resume or cancel below", systemImage: "pause.circle")
                     .font(.subheadline)
@@ -460,6 +504,19 @@ struct PrinterDetailView: View {
 
                 if let estimated = job.job?.estimatedPrintTime {
                     LabeledContent("Estimated Total", value: formatDuration(estimated))
+                }
+
+                // ETA countdown for HTTP printers
+                if let timeLeft = progress.printTimeLeft, timeLeft > 0 {
+                    LabeledContent("ETA") {
+                        HStack(spacing: 6) {
+                            Image(systemName: "clock.badge.checkmark")
+                                .foregroundStyle(.green)
+                            Text(Date().addingTimeInterval(timeLeft).formatted(date: .omitted, time: .shortened))
+                                .fontWeight(.semibold)
+                                .foregroundStyle(.green)
+                        }
+                    }
                 }
             }
         }
@@ -630,6 +687,18 @@ struct PrinterDetailView: View {
                 }
             }
         }
+    }
+
+    // MARK: - Temperature Recording
+
+    private func recordTemperature() {
+        guard let temp = manager.printerStatus?.temperature else { return }
+        tempHistory.record(
+            toolActual: temp.tool0?.actual,
+            toolTarget: temp.tool0?.target,
+            bedActual: temp.bed?.actual,
+            bedTarget: temp.bed?.target
+        )
     }
 
     // MARK: - Helpers

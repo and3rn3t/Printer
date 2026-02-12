@@ -493,6 +493,7 @@ struct PrintHistoryView: View {
 
 struct PrintHistoryRowView: View {
     let job: PrintJob
+    @Environment(\.modelContext) private var modelContext
 
     var body: some View {
         HStack(spacing: 12) {
@@ -565,6 +566,9 @@ struct PrintHistoryRowView: View {
 
             Spacer()
 
+            // Photo log badge
+            PhotoLogBadge(count: snapshotCount)
+
             // Status badge
             Text(statusText)
                 .font(.caption2)
@@ -576,6 +580,18 @@ struct PrintHistoryRowView: View {
                 .clipShape(Capsule())
         }
         .padding(.vertical, 2)
+        .onAppear { loadSnapshotCount() }
+    }
+
+    /// Count of snapshots for this job (fetched on appear)
+    @State private var snapshotCount: Int = 0
+
+    private func loadSnapshotCount() {
+        let jobID = job.id
+        let descriptor = FetchDescriptor<PrintSnapshot>(
+            predicate: #Predicate { $0.printJob?.id == jobID }
+        )
+        snapshotCount = (try? modelContext.fetchCount(descriptor)) ?? 0
     }
 
     // MARK: - Status Styling

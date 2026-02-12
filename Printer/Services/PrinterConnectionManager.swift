@@ -78,6 +78,9 @@ final class PrinterConnectionManager {
     /// Estimated remaining time in seconds for ACT printers
     private(set) var estimatedTimeRemaining: Int?
 
+    /// Whether the "finishing soon" notification has been sent for the current session
+    private var finishingSoonNotified = false
+
     /// The polling interval in seconds
     var pollingInterval: TimeInterval = 5
 
@@ -221,6 +224,16 @@ final class PrinterConnectionManager {
                     let totalSeconds = Double(estimatedTotal)
                     self.estimatedProgress = min(elapsed / totalSeconds, 0.99)
                     self.estimatedTimeRemaining = max(Int(totalSeconds - elapsed), 0)
+
+                    // "Finishing soon" notification when < 10 minutes remain
+                    if let remaining = self.estimatedTimeRemaining, remaining > 0, remaining < 600, !self.finishingSoonNotified {
+                        self.finishingSoonNotified = true
+                        PrintNotificationManager.shared.notifyPrintFinishingSoon(
+                            fileName: job.fileName,
+                            printerName: job.printerName,
+                            estimatedTimeRemaining: TimeInterval(remaining)
+                        )
+                    }
                 } else if elapsed > 0 {
                     // No metadata — show elapsed but no percentage
                     self.estimatedProgress = nil
@@ -450,6 +463,11 @@ final class PrinterConnectionManager {
             )
         }
         #endif
+
+        // Start time-lapse capture for OctoPrint printers with webcam
+        if proto == .octoprint, UserDefaults.standard.bool(forKey: "timelapseEnabled") != false {
+            startTimelapseCapture(printerIP: printerIP, apiKey: printer?.apiKey, job: job)
+        }
     }
 
     /// Record accumulated elapsed time (on pause)
@@ -475,12 +493,21 @@ final class PrinterConnectionManager {
                     job.elapsedTime += elapsed
                     job.status = status
                     job.endDate = Date()
+
+                    // Auto-deduct from inventory on successful completion
+                    if status == .completed {
+                        deductInventory(for: job)
+                    }
                 }
             }
         } else if let job = activeJob {
             Task { @MainActor in
                 job.status = status
                 job.endDate = Date()
+
+                if status == .completed {
+                    deductInventory(for: job)
+                }
             }
         }
 
@@ -510,6 +537,47 @@ final class PrinterConnectionManager {
 
         printSessionStart = nil
         activeJob = nil
+        finishingSoonNotified = false
+
+        // Stop time-lapse capture
+        Task {
+            await TimelapseCapture.shared.stopCapture()
+        }
+    }
+
+    /// Start time-lapse snapshot capture for an OctoPrint print
+    private func startTimelapseCapture(printerIP: String, apiKey: String?, job: PrintJob) {
+        guard let context = modelContext else { return }
+        let api = AnycubicPrinterAPI()
+
+        Task {
+            guard let snapshotURL = await api.getWebcamSnapshotURL(ipAddress: printerIP, apiKey: apiKey) else { return }
+            await TimelapseCapture.shared.startCapture(snapshotURL: snapshotURL, job: job, modelContext: context)
+        }
+    }
+
+    /// Deduct material volume from the first matching inventory item after a successful print
+    @MainActor
+    private func deductInventory(for job: PrintJob) {
+        guard let volume = job.model?.slicedVolumeMl, volume > 0 else { return }
+        guard let profile = job.resinProfile, let modelContext else { return }
+
+        // Find an active (non-depleted) inventory item for this profile
+        let descriptor = FetchDescriptor<InventoryItem>()
+        guard let inventoryItems = try? modelContext.fetch(descriptor) else { return }
+
+        if let item = inventoryItems.first(where: { $0.resinProfile?.id == profile.id && !$0.isDepleted }) {
+            item.deduct(Double(volume))
+
+            // Send low-stock notification if needed
+            if item.isLowStock {
+                PrintNotificationManager.shared.notifyLowStock(
+                    itemName: item.name,
+                    remaining: item.remainingVolume,
+                    unit: profile.materialType.isResin ? "mL" : "g"
+                )
+            }
+        }
     }
 
     deinit {

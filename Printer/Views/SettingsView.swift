@@ -135,6 +135,9 @@ struct SettingsView: View {
         }
     }
 
+    @AppStorage("timelapseEnabled") private var timelapseEnabled = true
+    @AppStorage("timelapseIntervalSeconds") private var timelapseIntervalSeconds: Double = 60
+
     private var printingSection: some View {
         Section {
             Toggle("Show Slicing Warnings", isOn: $showSlicingWarnings)
@@ -144,10 +147,20 @@ struct SettingsView: View {
             if autoDeleteCompletedJobs {
                 Stepper("Keep for \(completedJobRetentionDays) days", value: $completedJobRetentionDays, in: 1...365)
             }
+
+            Toggle("Time-lapse Capture", isOn: $timelapseEnabled)
+
+            if timelapseEnabled {
+                VStack(alignment: .leading) {
+                    Text("Capture Interval: \(Int(timelapseIntervalSeconds))s")
+                        .font(.subheadline)
+                    Slider(value: $timelapseIntervalSeconds, in: 10...300, step: 10)
+                }
+            }
         } header: {
             Label("Printing", systemImage: "paintbrush.pointed")
         } footer: {
-            Text("Slicing warnings remind you when a model format isn't directly printable on resin printers.")
+            Text("Time-lapse captures webcam snapshots during prints for photo logs.")
         }
     }
 
@@ -205,10 +218,16 @@ struct SettingsView: View {
             } label: {
                 Label("Material Profiles", systemImage: "drop.fill")
             }
+
+            NavigationLink {
+                InventoryView()
+            } label: {
+                Label("Material Inventory", systemImage: "shippingbox")
+            }
         } header: {
             Label("Materials", systemImage: "drop.fill")
         } footer: {
-            Text("Define resin or filament profiles with cost and exposure settings to track per-material costs.")
+            Text("Define resin or filament profiles with cost and exposure settings. Track physical stock levels in inventory.")
         }
     }
 

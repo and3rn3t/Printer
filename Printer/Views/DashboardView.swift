@@ -25,6 +25,8 @@ struct DashboardView: View {
         var fileName: String?
         var currentLayer: Int?
         var totalLayers: Int?
+        var estimatedTimeRemaining: TimeInterval?
+        var estimatedCompletionDate: Date?
     }
 
     /// Recent completed/failed/cancelled jobs (last 5)
@@ -199,6 +201,26 @@ struct DashboardView: View {
                         }
                     }
                 }
+
+                // ETA countdown
+                if let eta = state.estimatedCompletionDate {
+                    HStack(spacing: 6) {
+                        Image(systemName: "clock.badge.checkmark")
+                            .font(.caption)
+                            .foregroundStyle(.green)
+                        Text("ETA \(eta.formatted(date: .omitted, time: .shortened))")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .foregroundStyle(.green)
+                        Spacer()
+                        if let remaining = state.estimatedTimeRemaining, remaining > 0 {
+                            Text(Self.formatCountdown(remaining))
+                                .font(.caption)
+                                .monospacedDigit()
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
             }
         }
         .padding()
@@ -334,6 +356,17 @@ struct DashboardView: View {
 
     // MARK: - Helpers
 
+    /// Format a countdown duration into a compact string
+    private static func formatCountdown(_ seconds: TimeInterval) -> String {
+        let total = Int(seconds)
+        let h = total / 3600
+        let m = (total % 3600) / 60
+        if h > 0 {
+            return "\(h)h \(m)m left"
+        }
+        return "\(m)m left"
+    }
+
     private var successRate: String {
         let completed = allJobs.filter { $0.status == .completed }.count
         let total = allJobs.filter { $0.status == .completed || $0.status == .failed }.count
@@ -392,6 +425,10 @@ struct DashboardView: View {
                                 var state = printerStates[printer.id] ?? PrinterLiveState()
                                 state.fileName = job.job?.file?.name
                                 state.progress = job.progress?.completion.map { $0 / 100.0 }
+                                if let remaining = job.progress?.printTimeLeft, remaining > 0 {
+                                    state.estimatedTimeRemaining = remaining
+                                    state.estimatedCompletionDate = Date().addingTimeInterval(remaining)
+                                }
                                 printerStates[printer.id] = state
                             }
                         }

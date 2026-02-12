@@ -12,6 +12,7 @@ struct ModelDetailView: View {
     @Bindable var model: PrintModel
     let printers: [Printer]
     @Environment(\.modelContext) private var modelContext
+    @Query(sort: \PrintModel.name) private var allModels: [PrintModel]
 
     @AppStorage("showSlicingWarnings") private var showSlicingWarnings = true
     @AppStorage("confirmBeforeDelete") private var confirmBeforeDelete = true
@@ -21,11 +22,15 @@ struct ModelDetailView: View {
     @State private var isEditingName = false
     @State private var showingShareSheet = false
     @State private var showingDeleteConfirm = false
-    @State private var showingTagEditor = false
     @State private var newTag = ""
     @State private var show3DPreview = false
     @State private var showingCollectionPicker = false
     
+    /// All unique tags across the library for auto-suggest
+    private var allUniqueTags: [String] {
+        Array(Set(allModels.flatMap { $0.tags })).sorted()
+    }
+
     /// Whether this model supports interactive 3D preview
     private var canShow3D: Bool {
         let ext = model.fileURL.components(separatedBy: ".").last?.lowercased() ?? ""
@@ -249,6 +254,22 @@ struct ModelDetailView: View {
                                     dimensionPill(label: "H", value: z, color: .blue)
                                     Spacer()
                                 }
+
+                                // Build plate preview against first printer with plate dimensions
+                                if let printer = printers.first(where: {
+                                    ($0.buildPlateX ?? 0) > 0 && ($0.buildPlateY ?? 0) > 0 && ($0.buildPlateZ ?? 0) > 0
+                                }), let bpX = printer.buildPlateX, let bpY = printer.buildPlateY, let bpZ = printer.buildPlateZ {
+                                    BuildPlateView(
+                                        plateX: bpX,
+                                        plateY: bpY,
+                                        plateZ: bpZ,
+                                        modelX: x,
+                                        modelY: y,
+                                        modelZ: z,
+                                        isResinPrinter: printer.printerProtocol == .act
+                                    )
+                                    .padding(.top, 4)
+                                }
                             }
 
                             if let verts = model.vertexCount, verts > 0 {
@@ -406,18 +427,10 @@ struct ModelDetailView: View {
                                 .foregroundStyle(.blue)
                             Text("Tags")
                                 .font(.headline)
-                            Spacer()
-                            Button {
-                                showingTagEditor = true
-                            } label: {
-                                Image(systemName: "plus.circle.fill")
-                                    .foregroundStyle(.blue)
-                            }
-                            .buttonStyle(.plain)
                         }
 
                         if model.tags.isEmpty {
-                            Text("No tags — tap + to add")
+                            Text("No tags — add one below")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         } else {
@@ -425,18 +438,16 @@ struct ModelDetailView: View {
                                 model.tags.removeAll { $0 == tag }
                             }
                         }
-                    }
-                    .alert("Add Tag", isPresented: $showingTagEditor) {
-                        TextField("Tag name", text: $newTag)
-                        Button("Add") {
-                            let trimmed = newTag.trimmingCharacters(in: .whitespaces)
-                            if !trimmed.isEmpty && !model.tags.contains(trimmed) {
-                                model.tags.append(trimmed)
+
+                        TagAutoSuggestField(
+                            existingTags: allUniqueTags,
+                            newTag: $newTag
+                        ) { tag in
+                            if !model.tags.contains(tag) {
+                                model.tags.append(tag)
                                 model.modifiedDate = Date()
                             }
-                            newTag = ""
                         }
-                        Button("Cancel", role: .cancel) { newTag = "" }
                     }
                     
                     Divider()

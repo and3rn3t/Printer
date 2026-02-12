@@ -23,6 +23,9 @@ struct PrinterApp: App {
             ModelCollection.self,
             MaintenanceEvent.self,
             ResinProfile.self,
+            SavedFilter.self,
+            InventoryItem.self,
+            PrintSnapshot.self,
         ])
 
         let iCloudEnabled = UserDefaults.standard.bool(forKey: "enableICloudSync")

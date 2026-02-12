@@ -24,6 +24,7 @@ struct ContentView: View {
     @State private var showingPrintQueue = false
     @State private var showingStatistics = false
     @State private var showingCollections = false
+    @State private var showingTagBrowser = false
     @State private var columnVisibility = NavigationSplitViewVisibility.all
     @State private var selectedTab = 0
     @State private var errorMessage: String?
@@ -100,6 +101,9 @@ struct ContentView: View {
         .sheet(isPresented: $showingCollections) {
             CollectionListView()
         }
+        .sheet(isPresented: $showingTagBrowser) {
+            TagBrowserView()
+        }
         .alert("Error", isPresented: $showingError) {
             Button("OK", role: .cancel) { }
         } message: {
@@ -124,6 +128,7 @@ struct ContentView: View {
                 showingPrintQueue: $showingPrintQueue,
                 showingStatistics: $showingStatistics,
                 showingCollections: $showingCollections,
+                showingTagBrowser: $showingTagBrowser,
                 onDelete: deleteModels
             )
         } detail: {
@@ -340,6 +345,7 @@ struct ModelListView: View {
     @Binding var showingPrintQueue: Bool
     @Binding var showingStatistics: Bool
     @Binding var showingCollections: Bool
+    @Binding var showingTagBrowser: Bool
     let onDelete: (IndexSet) -> Void
 
     @Environment(\.modelContext) private var modelContext
@@ -539,129 +545,7 @@ struct ModelListView: View {
         .navigationSplitViewColumnWidth(min: 200, ideal: 250)
 #endif
         .toolbar {
-#if os(iOS)
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button(isSelectMode ? "Done" : "Select") {
-                    withAnimation {
-                        isSelectMode.toggle()
-                        if !isSelectMode {
-                            selectedModelIDs.removeAll()
-                        }
-                    }
-                }
-            }
-#endif
-            ToolbarItem(placement: .primaryAction) {
-                Menu {
-                    Button {
-                        showingScanner = true
-                    } label: {
-                        Label("Scan Object", systemImage: "camera.fill")
-                    }
-                    
-                    Button {
-                        showingImporter = true
-                    } label: {
-                        Label("Import File", systemImage: "square.and.arrow.down")
-                    }
-                } label: {
-                    Label("Add Model", systemImage: "plus")
-                }
-            }
-
-            ToolbarItem(placement: .primaryAction) {
-                Button {
-                    showingPrintables = true
-                } label: {
-                    Label("Printables", systemImage: "globe")
-                }
-            }
-
-            ToolbarItem(placement: .primaryAction) {
-                Menu {
-                    // Sort options
-                    Section("Sort By") {
-                        ForEach(ModelSortOption.allCases) { option in
-                            Button {
-                                sortOptionRaw = option.rawValue
-                            } label: {
-                                HStack {
-                                    Text(option.rawValue)
-                                    if sortOption == option {
-                                        Image(systemName: "checkmark")
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    // Filter options
-                    Section("Filter") {
-                        ForEach(ModelFilterOption.allCases) { option in
-                            Button {
-                                filterOption = option
-                            } label: {
-                                HStack {
-                                    Text(option.rawValue)
-                                    if filterOption == option {
-                                        Image(systemName: "checkmark")
-                                    }
-                                }
-                            }
-                        }
-                    }
-                } label: {
-                    Label("Sort & Filter", systemImage: "line.3.horizontal.decrease.circle")
-                }
-            }
-
-            ToolbarItem(placement: .primaryAction) {
-                Button {
-                    showingPrintQueue = true
-                } label: {
-                    Label("Print Queue", systemImage: "list.number")
-                }
-            }
-
-            ToolbarItem(placement: .primaryAction) {
-                Button {
-                    showingPrintHistory = true
-                } label: {
-                    Label("History", systemImage: "clock.arrow.circlepath")
-                }
-            }
-
-            ToolbarItem(placement: .primaryAction) {
-                Button {
-                    showingStatistics = true
-                } label: {
-                    Label("Statistics", systemImage: "chart.bar.fill")
-                }
-            }
-
-            ToolbarItem(placement: .primaryAction) {
-                Button {
-                    showingCollections = true
-                } label: {
-                    Label("Collections", systemImage: "folder")
-                }
-            }
-
-            ToolbarItem(placement: .primaryAction) {
-                Button {
-                    showingPrinterSetup = true
-                } label: {
-                    Label("Printers", systemImage: "printer")
-                }
-            }
-
-            ToolbarItem(placement: .primaryAction) {
-                Button {
-                    showingSettings = true
-                } label: {
-                    Label("Settings", systemImage: "gear")
-                }
-            }
+            modelListToolbar
         }
         .alert("Add Tag", isPresented: $showingBatchTag) {
             TextField("Tag name", text: $batchTagText)
@@ -675,6 +559,143 @@ struct ModelListView: View {
         }
         .sheet(isPresented: $showingBatchCollectionPicker) {
             BatchAddToCollectionView(modelIDs: selectedModelIDs, allModels: models)
+        }
+    }
+
+    // MARK: - Toolbar
+
+    @ToolbarContentBuilder
+    private var modelListToolbar: some ToolbarContent {
+#if os(iOS)
+        ToolbarItem(placement: .navigationBarTrailing) {
+            Button(isSelectMode ? "Done" : "Select") {
+                withAnimation {
+                    isSelectMode.toggle()
+                    if !isSelectMode {
+                        selectedModelIDs.removeAll()
+                    }
+                }
+            }
+        }
+#endif
+        ToolbarItem(placement: .primaryAction) {
+            Menu {
+                Button {
+                    showingScanner = true
+                } label: {
+                    Label("Scan Object", systemImage: "camera.fill")
+                }
+
+                Button {
+                    showingImporter = true
+                } label: {
+                    Label("Import File", systemImage: "square.and.arrow.down")
+                }
+            } label: {
+                Label("Add Model", systemImage: "plus")
+            }
+        }
+
+        ToolbarItem(placement: .primaryAction) {
+            Button {
+                showingPrintables = true
+            } label: {
+                Label("Printables", systemImage: "globe")
+            }
+        }
+
+        ToolbarItem(placement: .primaryAction) {
+            sortFilterMenu
+        }
+
+        ToolbarItem(placement: .primaryAction) {
+            Button {
+                showingPrintQueue = true
+            } label: {
+                Label("Print Queue", systemImage: "list.number")
+            }
+        }
+
+        ToolbarItem(placement: .primaryAction) {
+            Menu {
+                Button {
+                    showingPrintHistory = true
+                } label: {
+                    Label("History", systemImage: "clock.arrow.circlepath")
+                }
+
+                Button {
+                    showingStatistics = true
+                } label: {
+                    Label("Statistics", systemImage: "chart.bar.fill")
+                }
+
+                Button {
+                    showingCollections = true
+                } label: {
+                    Label("Collections", systemImage: "folder")
+                }
+
+                Button {
+                    showingTagBrowser = true
+                } label: {
+                    Label("Tags", systemImage: "tag")
+                }
+            } label: {
+                Label("More", systemImage: "ellipsis.circle")
+            }
+        }
+
+        ToolbarItem(placement: .primaryAction) {
+            Button {
+                showingPrinterSetup = true
+            } label: {
+                Label("Printers", systemImage: "printer")
+            }
+        }
+
+        ToolbarItem(placement: .primaryAction) {
+            Button {
+                showingSettings = true
+            } label: {
+                Label("Settings", systemImage: "gear")
+            }
+        }
+    }
+
+    private var sortFilterMenu: some View {
+        Menu {
+            Section("Sort By") {
+                ForEach(ModelSortOption.allCases) { option in
+                    Button {
+                        sortOptionRaw = option.rawValue
+                    } label: {
+                        HStack {
+                            Text(option.rawValue)
+                            if sortOption == option {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+                }
+            }
+
+            Section("Filter") {
+                ForEach(ModelFilterOption.allCases) { option in
+                    Button {
+                        filterOption = option
+                    } label: {
+                        HStack {
+                            Text(option.rawValue)
+                            if filterOption == option {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+                }
+            }
+        } label: {
+            Label("Sort & Filter", systemImage: "line.3.horizontal.decrease.circle")
         }
     }
 

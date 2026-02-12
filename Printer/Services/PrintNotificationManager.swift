@@ -149,6 +149,52 @@ final class PrintNotificationManager: @unchecked Sendable {
         UNUserNotificationCenter.current().add(request)
     }
 
+    // MARK: - Finishing Soon Notification
+
+    /// Send a notification when a print is almost done (< 10 minutes remaining).
+    func notifyPrintFinishingSoon(
+        fileName: String?,
+        printerName: String,
+        estimatedTimeRemaining: TimeInterval
+    ) {
+        guard UserDefaults.standard.bool(forKey: "enablePrintNotifications") else { return }
+
+        let content = UNMutableNotificationContent()
+        let displayName = fileName ?? "Print"
+
+        content.title = "\(displayName) — Finishing Soon"
+        content.body = "\(printerName) · ~\(Self.formatDuration(estimatedTimeRemaining)) remaining"
+        content.sound = .default
+        content.threadIdentifier = "print-progress"
+
+        let request = UNNotificationRequest(
+            identifier: "finishing-soon-\(printerName)",
+            content: content,
+            trigger: nil
+        )
+        UNUserNotificationCenter.current().add(request)
+    }
+
+    // MARK: - Low Stock Notification
+
+    /// Notify when a material inventory item is running low.
+    func notifyLowStock(itemName: String, remaining: Double, unit: String) {
+        guard UserDefaults.standard.bool(forKey: "enablePrintNotifications") else { return }
+
+        let content = UNMutableNotificationContent()
+        content.title = "Low Stock: \(itemName)"
+        content.body = "Only \(Int(remaining)) \(unit) remaining"
+        content.sound = .default
+        content.threadIdentifier = "inventory"
+
+        let request = UNNotificationRequest(
+            identifier: "low-stock-\(itemName)",
+            content: content,
+            trigger: nil
+        )
+        UNUserNotificationCenter.current().add(request)
+    }
+
     // MARK: - Helpers
 
     private static func formatDuration(_ seconds: TimeInterval) -> String {
