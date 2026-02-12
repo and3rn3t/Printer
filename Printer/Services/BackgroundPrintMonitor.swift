@@ -7,7 +7,9 @@
 
 import Foundation
 import SwiftData
+#if os(iOS)
 import BackgroundTasks
+#endif
 #if canImport(UIKit)
 import UIKit
 #endif
@@ -30,6 +32,7 @@ actor BackgroundPrintMonitor {
 
     // MARK: - Registration
 
+    #if os(iOS)
     /// Register the background task with BGTaskScheduler. Call once at app launch.
     nonisolated func registerBackgroundTask() {
         BGTaskScheduler.shared.register(
@@ -71,6 +74,7 @@ actor BackgroundPrintMonitor {
 
         task.setTaskCompleted(success: true)
     }
+    #endif
 
     // MARK: - Polling
 

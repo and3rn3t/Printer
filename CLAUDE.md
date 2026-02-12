@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Printer is a SwiftUI 3D printing management app for Anycubic printers. Users import/scan 3D models (STL, OBJ, USDZ), convert between formats, manage a model library, discover and connect to printers over the local network, and control print jobs. This is a personal learning project (not monetized).
+Printer is a SwiftUI 3D printing management app for Anycubic printers. Users import/scan 3D models (STL, OBJ, USDZ), convert between formats, manage a model library with collections and tags, discover and connect to printers over the local network, control print jobs, track inventory, log maintenance, and monitor costs. This is a personal learning project (not monetized).
 
 The developer owns an **Anycubic Photon Mono X 6K** resin printer (firmware V0.2.2) at `192.168.1.49:6000` using the ACT protocol.
 
@@ -15,32 +15,69 @@ The developer owns an **Anycubic Photon Mono X 6K** resin printer (firmware V0.2
 - **Networking**: `NWConnection` (TCP for ACT protocol), `URLSession` (HTTP for OctoPrint/Anycubic HTTP)
 - **Concurrency**: Swift actors for thread-safe services, structured concurrency throughout
 - **Observation**: `@Observable` for discovery and network monitoring classes
+- **Widgets**: WidgetKit (Home Screen widget + Live Activity)
+- **Intents**: App Intents framework (Siri Shortcuts)
 
 ## Project Structure
 
 ```
 Printer/
   App/          — PrinterApp.swift (@main entry, ModelContainer setup)
-  Models/       — SwiftData models: PrintModel, PrintJob, Printer, PrinterProtocol, enums
-  Views/        — SwiftUI views (ContentView, ModelDetailView, PrintJobView, PrinterManagementView, ObjectScannerView)
+  Models/       — SwiftData models + Codable enums:
+                    Item.swift (PrintModel, PrintJob, Printer, PrinterProtocol, PrintStatus, ModelSource)
+                    ModelCollection.swift, InventoryItem.swift, MaintenanceEvent.swift,
+                    ResinProfile.swift, PrintPhotoLog.swift, PrintablesModels.swift,
+                    PrintActivityAttributes.swift, SavedFilter.swift
+  Views/        — SwiftUI views:
+                    ContentView, DashboardView, ModelDetailView, PrintJobView,
+                    PrinterManagementView, PrinterDetailView, EditPrinterView,
+                    PrinterFileBrowserView, ObjectScannerView, CollectionManagementView,
+                    PrintHistoryView, PrintQueueView, CostAnalyticsView, StatisticsView,
+                    InventoryView, ResinProfileView, MaintenanceLogView, PhotoLogView,
+                    FailureAnnotationView, PrintablesBrowseView, PrintablesDetailView,
+                    TagBrowserView, SettingsView, ShareSheetView
+                  Components/ — BuildPlateView, FlowLayout, Model3DPreviewView,
+                    StatusDisplayHelpers, TemperatureChartView, WebcamStreamView
   Services/     — Actor-based services:
-                    AnycubicPrinterAPI  — unified printer API (delegates to PhotonPrinterService for ACT)
-                    PhotonPrinterService — ACT protocol client (TCP port 6000 for Photon resin printers)
-                    PrinterDiscovery    — Bonjour, subnet scan, ACT probing
-                    STLFileManager      — file import/save/delete/validate
-                    ModelConverter      — USDZ/OBJ/STL conversion
-                    NetworkMonitor      — NWPathMonitor wrapper
+                    AnycubicPrinterAPI    — unified printer API (delegates ACT → PhotonPrinterService)
+                    PhotonPrinterService  — ACT protocol client (TCP port 6000)
+                    PrinterDiscovery      — Bonjour, subnet scan, ACT probing
+                    PrinterConnectionManager — connection state management
+                    STLFileManager        — file import/save/delete/validate
+                    ModelConverter        — USDZ/OBJ/STL conversion
+                    MeshAnalyzer          — triangle count, bounds, manifold checks
+                    SlicedFileParser      — parse sliced file metadata (.pwmx, etc.)
+                    NetworkMonitor        — NWPathMonitor wrapper
+                    PrintablesService     — Printables.com API client
+                    CloudSyncManager      — iCloud/CloudKit sync
+                    ExportService         — library export/import
+                    BackgroundPrintMonitor — background print status polling
+                    PrintNotificationManager — local notifications
+                    PrintActivityManager  — Live Activity management
+                    MaintenanceScheduler  — maintenance reminder scheduling
+                    TimelapseCapture      — print timelapse capture
+                    WidgetSharedData      — shared data for widget extension
+  Intents/      — PrinterEntity, PrinterIntents, PrinterShortcuts (Siri Shortcuts)
   Resources/    — Info.plist, entitlements, Assets.xcassets
-  Docs/         — Markdown documentation (ANYCUBIC_API.md, BUILD_FIXES.md, etc.)
+  Docs/         — ANYCUBIC_API.md (ACT reference), PHOTON_PROTOCOL_RESEARCH.md (multi-protocol),
+                  INFO_PLIST_SETUP.md (required plist entries)
+
+widget/         — WidgetKit extension (PrinterStatusWidget, PrinterLiveActivity, etc.)
 ```
 
 ## Data Models (Item.swift)
 
 | Model | Key Properties |
 |-------|---------------|
-| `PrintModel` | `name`, `fileURL` (relative path), `resolvedFileURL` (computed), `fileSize`, `source`, `thumbnailData` (@Attribute(.externalStorage)), `printJobs` |
+| `PrintModel` | `name`, `fileURL` (relative path), `resolvedFileURL` (computed), `fileSize`, `source`, `thumbnailData` (@Attribute(.externalStorage)), `printJobs`, `collections` |
 | `PrintJob` | `startDate`, `endDate`, `status` (PrintStatus enum), `printerName`, `model` |
 | `Printer` | `name`, `ipAddress`, `port`, `printerProtocol` (PrinterProtocol enum), `apiKey`, `serialNumber`, `firmwareVersion` |
+| `ModelCollection` | `name`, `models` — named groups for organizing models |
+| `InventoryItem` | Resin/filament stock tracking with usage history |
+| `ResinProfile` | Per-resin exposure settings |
+| `MaintenanceEvent` | Printer maintenance log entries |
+| `PrintPhotoLog` | Photo documentation of print results |
+| `SavedFilter` | Persisted search/filter configurations |
 | `PrinterProtocol` | `.act` (TCP 6000), `.octoprint` (HTTP 80), `.anycubicHTTP` (HTTP 18910) |
 | `ModelSource` | `.scanned`, `.imported`, `.downloaded` |
 | `PrintStatus` | `.preparing`, `.uploading`, `.queued`, `.printing`, `.completed`, `.failed`, `.cancelled` |
@@ -74,6 +111,9 @@ Printer/
 - Error handling uses **`LocalizedError`-conforming enums** with `.alert()` modifiers in views (no `print()` for user-facing errors)
 - Printer discovery uses `@Observable` (`PrinterDiscovery`) with Bonjour + ACT probing + subnet scanning
 - Cross-platform support via `#if os(iOS)` / `#if os(macOS)` conditionals
+- Reusable view components in `Views/Components/`
+- WidgetKit extension in `widget/` for Home Screen widget + Live Activity
+- App Intents in `Intents/` for Siri Shortcuts
 
 ## Code Conventions
 
@@ -121,24 +161,30 @@ xcodebuild -project Printer.xcodeproj -scheme Printer test
 
 | File | Purpose |
 |------|---------|
-| `Printer/Models/Item.swift` | All SwiftData model definitions + enums |
+| `Printer/Models/Item.swift` | All core SwiftData model definitions + enums |
 | `Printer/Services/AnycubicPrinterAPI.swift` | Unified printer API with retry logic |
 | `Printer/Services/PhotonPrinterService.swift` | ACT protocol TCP client for Photon printers |
 | `Printer/Services/PrinterDiscovery.swift` | Network discovery (Bonjour + ACT + subnet) |
 | `Printer/Services/STLFileManager.swift` | File I/O with relative path support |
+| `Printer/Services/PrintablesService.swift` | Printables.com API integration |
 | `Printer/Views/ContentView.swift` | Main app navigation and model list |
+| `Printer/Views/DashboardView.swift` | Overview dashboard |
 | `Printer/Views/PrinterManagementView.swift` | Printer management, discovery, detail/controls |
 | `Printer/App/PrinterApp.swift` | App entry point and ModelContainer setup |
 | `Printer/Docs/ANYCUBIC_API.md` | ACT protocol reference |
+| `Printer/Docs/PHOTON_PROTOCOL_RESEARCH.md` | Multi-protocol research (CBD, ACT, SDCP V3) |
 
 ## File Placement
 
 When creating new files:
 - SwiftUI views → `Printer/Views/`
+- Reusable view components → `Printer/Views/Components/`
 - Data models → `Printer/Models/`
 - Networking/file/conversion logic → `Printer/Services/`
 - App lifecycle → `Printer/App/`
+- Siri Shortcuts / App Intents → `Printer/Intents/`
 - Documentation → `Printer/Docs/`
+- Widget extension files → `widget/`
 
 ## Important Notes
 

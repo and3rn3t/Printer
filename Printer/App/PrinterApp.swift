@@ -49,7 +49,9 @@ struct PrinterApp: App {
     }()
 
     init() {
+        #if os(iOS)
         BackgroundPrintMonitor.shared.registerBackgroundTask()
+        #endif
     }
 
     var body: some Scene {
@@ -63,7 +65,9 @@ struct PrinterApp: App {
                         await PrintNotificationManager.shared.requestAuthorization()
                     }
                     // Schedule background print monitoring
+                    #if os(iOS)
                     BackgroundPrintMonitor.shared.scheduleBackgroundRefresh()
+                    #endif
                     // Check for overdue maintenance
                     checkMaintenanceAlerts()
                 }
