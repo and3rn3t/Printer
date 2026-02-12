@@ -258,7 +258,7 @@ actor PhotonPrinterService {
         ipAddress: String,
         port: Int
     ) async throws -> [String] {
-        return try await withCheckedThrowingContinuation { continuation in
+        try await withCheckedThrowingContinuation { continuation in
             let resumeGuard = SendOnce()
 
             let commandData = Data((command + "\r\n").utf8)

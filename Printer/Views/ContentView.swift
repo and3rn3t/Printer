@@ -119,7 +119,8 @@ struct ContentView: View {
     var body: some View {
         TabView(selection: $selectedTab) {
             Tab(
-                "Dashboard", systemImage: "gauge.with.dots.needle.bottom.50percent",
+                "Dashboard",
+                systemImage: "gauge.with.dots.needle.bottom.50percent",
                 value: .dashboard
             ) {
                 NavigationStack {

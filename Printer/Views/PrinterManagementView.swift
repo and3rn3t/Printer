@@ -178,7 +178,10 @@ struct PrinterRowView: View {
                 }
             } else {
                 let api = AnycubicPrinterAPI.shared
-                let reachable = await api.isReachable(ipAddress: printer.ipAddress, knownProtocol: printer.printerProtocol)
+                let reachable = await api.isReachable(
+                    ipAddress: printer.ipAddress,
+                    knownProtocol: printer.printerProtocol
+                )
                 await MainActor.run {
                     isReachable = reachable
                     printer.isConnected = reachable

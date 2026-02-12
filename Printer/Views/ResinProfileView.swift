@@ -287,7 +287,8 @@ struct EditResinProfileView: View {
                             Text("Normal Exposure (s)")
                             Spacer()
                             TextField(
-                                "—", value: $normalExposure,
+                                "—",
+                                value: $normalExposure,
                                 format: .number.precision(.fractionLength(1))
                             )
                             .multilineTextAlignment(.trailing)
@@ -300,7 +301,8 @@ struct EditResinProfileView: View {
                             Text("Bottom Exposure (s)")
                             Spacer()
                             TextField(
-                                "—", value: $bottomExposure,
+                                "—",
+                                value: $bottomExposure,
                                 format: .number.precision(.fractionLength(1))
                             )
                             .multilineTextAlignment(.trailing)
@@ -323,7 +325,8 @@ struct EditResinProfileView: View {
                             Text("Layer Height (mm)")
                             Spacer()
                             TextField(
-                                "—", value: $layerHeight,
+                                "—",
+                                value: $layerHeight,
                                 format: .number.precision(.fractionLength(3))
                             )
                             .multilineTextAlignment(.trailing)

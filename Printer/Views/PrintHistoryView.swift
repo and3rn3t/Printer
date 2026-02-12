@@ -160,9 +160,11 @@ struct PrintHistoryView: View {
         cachedActivityData = activityResult.sorted { $0.date < $1.date }
 
         // Duration data
-        cachedDurationData = grouped.map { date, jobs in
-            DurationData(date: date, hours: jobs.reduce(0.0) { $0 + $1.effectiveDuration } / 3600.0)
-        }.sorted { $0.date < $1.date }
+        cachedDurationData = grouped
+            .map { date, jobs in
+                DurationData(date: date, hours: jobs.reduce(0.0) { $0 + $1.effectiveDuration } / 3600.0)
+            }
+            .sorted { $0.date < $1.date }
 
         // Success rate
         let finished = allJobs.filter {

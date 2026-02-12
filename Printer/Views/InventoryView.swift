@@ -362,8 +362,10 @@ struct InventoryItemDetailView: View {
                                 item.resinProfile?.materialType.isResin == true ? "mL" : "g"
                             Text(
                                 String(
-                                    format: "%.0f %@", item.initialVolume - item.remainingVolume,
-                                    usedUnit)
+                                    format: "%.0f %@",
+                                    item.initialVolume - item.remainingVolume,
+                                    usedUnit
+                                )
                             )
                             .font(.headline)
                             Text("Used")

@@ -191,12 +191,12 @@ struct SettingsView: View {
                 Label("Print Notifications", systemImage: "bell.badge.fill")
             }
             .onChange(of: enablePrintNotifications) { _, enabled in
-                    if enabled {
-                        Task {
-                            await PrintNotificationManager.shared.requestAuthorization()
-                        }
+                if enabled {
+                    Task {
+                        await PrintNotificationManager.shared.requestAuthorization()
                     }
                 }
+            }
         } header: {
             Label("Notifications", systemImage: "bell.badge")
         } footer: {

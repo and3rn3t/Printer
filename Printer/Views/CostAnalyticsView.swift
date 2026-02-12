@@ -56,7 +56,10 @@ struct CostAnalyticsView: View {
     // MARK: - Computed Data
 
     private func refreshCachedData() {
-        let allJobs = (try? modelContext.fetch(FetchDescriptor<PrintJob>(sortBy: [SortDescriptor(\PrintJob.startDate, order: .reverse)]))) ?? []
+        let descriptor = FetchDescriptor<PrintJob>(
+            sortBy: [SortDescriptor(\PrintJob.startDate, order: .reverse)]
+        )
+        let allJobs = (try? modelContext.fetch(descriptor)) ?? []
 
         cachedCompletedJobs = allJobs.filter { $0.status == .completed }
         cachedJobsInRange = cachedCompletedJobs.filter { $0.startDate >= timeRange.startDate }
@@ -66,7 +69,9 @@ struct CostAnalyticsView: View {
         cachedTotalVolumeInRange = cachedJobsInRange.reduce(0) { $0 + Double($1.model?.slicedVolumeMl ?? 0) }
 
         let jobsWithCost = cachedJobsInRange.filter { costForJob($0) > 0 }
-        cachedAverageCostPerJob = jobsWithCost.isEmpty ? 0 : jobsWithCost.reduce(0) { $0 + costForJob($1) } / Double(jobsWithCost.count)
+        cachedAverageCostPerJob = jobsWithCost.isEmpty
+            ? 0
+            : jobsWithCost.reduce(0) { $0 + costForJob($1) } / Double(jobsWithCost.count)
 
         let cal = Calendar.current
         let monthStart = cal.date(from: cal.dateComponents([.year, .month], from: Date())) ?? Date()
