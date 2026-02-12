@@ -1,12 +1,15 @@
 # ──────────────────────────────────────────────────────────────
-# Printer — iOS CI  (optimized)
+# Printer — iOS CI
 # Lints, builds, tests, and builds the widget — all in parallel.
 #
-# Key optimizations vs. previous version:
+# Key optimizations:
 #   • Shared composite action for Xcode / simulator / tool setup
-#   • Homebrew, SPM, and DerivedData caching
-#   • Merged build + test into one job (build-for-testing ➜ test-without-building)
-#   • All three jobs run in parallel (no serial build→test chain)
+#   • Homebrew caching for tools
+#   • build-for-testing ➜ test-without-building (single compile)
+#   • No SPM/DerivedData caching (no packages; DD cache misses
+#     on every Swift change cost more than a clean rebuild)
+#   • Parallel compilation via JOBS flag
+#   • Widget built alongside main scheme in one job
 # ──────────────────────────────────────────────────────────────
 
 name: iOS CI
@@ -34,7 +37,6 @@ env:
   SCHEME: Printer
   PROJECT: Printer.xcodeproj
   XCBEAUTIFY_OPTS: "--disable-colored-output"
-  DERIVED_DATA: build/DerivedData
 
 jobs:
   # ── 1. SwiftLint (parallel) ───────────────────────────────
@@ -59,7 +61,7 @@ jobs:
   build-and-test:
     name: Build & Test (iOS)
     runs-on: macos-15
-    timeout-minutes: 30
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -67,34 +69,6 @@ jobs:
       - name: Setup Xcode environment
         id: setup
         uses: ./.github/actions/setup-xcode
-
-      # ── SPM package cache ──────────────────────────────────
-      - name: Cache SPM packages
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/Library/Developer/Xcode/DerivedData/**/SourcePackages
-            ${{ env.DERIVED_DATA }}/SourcePackages
-          key: spm-${{ runner.os }}-${{ hashFiles('**/Package.resolved', '**/project.pbxproj') }}
-          restore-keys: |
-            spm-${{ runner.os }}-
-
-      # ── DerivedData cache ──────────────────────────────────
-      - name: Cache DerivedData
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.DERIVED_DATA }}
-          key: deriveddata-${{ runner.os }}-${{ hashFiles('**/*.swift', '**/project.pbxproj') }}
-          restore-keys: |
-            deriveddata-${{ runner.os }}-
-
-      - name: Resolve package dependencies
-        run: |
-          xcodebuild -project "$PROJECT" \
-            -scheme "$SCHEME" \
-            -derivedDataPath "$DERIVED_DATA" \
-            -resolvePackageDependencies \
-            2>&1 | xcbeautify $XCBEAUTIFY_OPTS
 
       # build-for-testing compiles everything once; test-without-building
       # re-uses those products — no redundant rebuild.
@@ -105,12 +79,16 @@ jobs:
             -project "$PROJECT" \
             -scheme "$SCHEME" \
             -destination "${{ steps.setup.outputs.destination }}" \
-            -derivedDataPath "$DERIVED_DATA" \
             -configuration Debug \
+            -jobs $(sysctl -n hw.ncpu) \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
             COMPILER_INDEX_STORE_ENABLE=NO \
+            GCC_OPTIMIZATION_LEVEL=s \
+            SWIFT_OPTIMIZATION_LEVEL=-Onone \
+            DEBUG_INFORMATION_FORMAT=dwarf \
+            ENABLE_TESTABILITY=YES \
             2>&1 | xcbeautify $XCBEAUTIFY_OPTS
 
       - name: Run tests (without rebuilding)
@@ -120,9 +98,7 @@ jobs:
             -project "$PROJECT" \
             -scheme "$SCHEME" \
             -destination "${{ steps.setup.outputs.destination }}" \
-            -derivedDataPath "$DERIVED_DATA" \
             -resultBundlePath TestResults.xcresult \
-            -enableCodeCoverage YES \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
@@ -141,7 +117,7 @@ jobs:
   build-widget:
     name: Build Widget Extension
     runs-on: macos-15
-    timeout-minutes: 20
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -150,15 +126,6 @@ jobs:
         id: setup
         uses: ./.github/actions/setup-xcode
 
-      # ── DerivedData cache (widget) ─────────────────────────
-      - name: Cache DerivedData (widget)
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.DERIVED_DATA }}
-          key: deriveddata-widget-${{ runner.os }}-${{ hashFiles('**/*.swift', '**/project.pbxproj') }}
-          restore-keys: |
-            deriveddata-widget-${{ runner.os }}-
-
       - name: Build widget extension
         run: |
           set -o pipefail
@@ -166,10 +133,13 @@ jobs:
             -project "$PROJECT" \
             -scheme widgetExtension \
             -destination "${{ steps.setup.outputs.destination }}" \
-            -derivedDataPath "$DERIVED_DATA" \
             -configuration Debug \
+            -jobs $(sysctl -n hw.ncpu) \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
             COMPILER_INDEX_STORE_ENABLE=NO \
+            GCC_OPTIMIZATION_LEVEL=s \
+            SWIFT_OPTIMIZATION_LEVEL=-Onone \
+            DEBUG_INFORMATION_FORMAT=dwarf \
             2>&1 | xcbeautify $XCBEAUTIFY_OPTS
