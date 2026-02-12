@@ -185,13 +185,8 @@ struct PrinterStatusWidget: Widget {
 
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: PrinterStatusProvider()) { entry in
-            Group {
-                switch WidgetFamily.allCases.first {
-                default:
-                    SmallPrinterWidget(entry: entry)
-                }
-            }
-            .containerBackground(.fill.tertiary, for: .widget)
+            SmallPrinterWidget(entry: entry)
+                .containerBackground(.fill.tertiary, for: .widget)
         }
         .configurationDisplayName("Printer Status")
         .description("See your 3D printer status at a glance.")

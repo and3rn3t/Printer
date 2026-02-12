@@ -8,6 +8,7 @@
 import SwiftUI
 import SwiftData
 import WidgetKit
+import BackgroundTasks
 
 @main
 struct PrinterApp: App {
@@ -20,6 +21,8 @@ struct PrinterApp: App {
             PrintJob.self,
             Printer.self,
             ModelCollection.self,
+            MaintenanceEvent.self,
+            ResinProfile.self,
         ])
 
         let iCloudEnabled = UserDefaults.standard.bool(forKey: "enableICloudSync")
@@ -42,6 +45,10 @@ struct PrinterApp: App {
         }
     }()
 
+    init() {
+        BackgroundPrintMonitor.shared.registerBackgroundTask()
+    }
+
     var body: some Scene {
         WindowGroup {
             ContentView()
@@ -52,6 +59,8 @@ struct PrinterApp: App {
                     if UserDefaults.standard.bool(forKey: "enablePrintNotifications") {
                         await PrintNotificationManager.shared.requestAuthorization()
                     }
+                    // Schedule background print monitoring
+                    BackgroundPrintMonitor.shared.scheduleBackgroundRefresh()
                 }
         }
         .modelContainer(sharedModelContainer)

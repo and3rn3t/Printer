@@ -117,6 +117,38 @@ final class PrintNotificationManager: @unchecked Sendable {
         UNUserNotificationCenter.current().add(request)
     }
 
+    // MARK: - Milestone Notifications
+
+    /// Send a milestone notification (e.g. 25%, 50%, 75% complete).
+    func notifyPrintMilestone(
+        fileName: String?,
+        printerName: String,
+        milestone: Int,
+        estimatedTimeRemaining: TimeInterval?
+    ) {
+        guard UserDefaults.standard.bool(forKey: "enablePrintNotifications") else { return }
+
+        let content = UNMutableNotificationContent()
+        let displayName = fileName ?? "Print"
+
+        content.title = "\(displayName) — \(milestone)% Complete"
+
+        if let remaining = estimatedTimeRemaining, remaining > 0 {
+            content.body = "\(printerName) · ~\(Self.formatDuration(remaining)) remaining"
+        } else {
+            content.body = "Printing on \(printerName)"
+        }
+        content.sound = .default
+        content.threadIdentifier = "print-progress"
+
+        let request = UNNotificationRequest(
+            identifier: "milestone-\(printerName)-\(milestone)",
+            content: content,
+            trigger: nil
+        )
+        UNUserNotificationCenter.current().add(request)
+    }
+
     // MARK: - Helpers
 
     private static func formatDuration(_ seconds: TimeInterval) -> String {

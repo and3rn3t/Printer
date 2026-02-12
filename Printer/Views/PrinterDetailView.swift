@@ -109,6 +109,15 @@ struct PrinterDetailView: View {
 
             // Connection details
             connectionDetailsSection
+
+            // Maintenance
+            Section {
+                NavigationLink {
+                    MaintenanceLogView(printer: printer)
+                } label: {
+                    Label("Maintenance Log", systemImage: "wrench.and.screwdriver")
+                }
+            }
         }
         .navigationTitle(printer.name)
         .toolbar {

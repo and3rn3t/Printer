@@ -20,6 +20,10 @@ struct PrintHistoryView: View {
     @State private var statusFilter: StatusFilter = .all
     @State private var searchText = ""
     @State private var chartRange: ChartRange = .month
+    @State private var annotatingJob: PrintJob?
+    @State private var retryJob: PrintJob?
+    @State private var exportURL: URL?
+    @State private var showingExportShare = false
 
     // MARK: - Filter Types
 
@@ -193,6 +197,33 @@ struct PrintHistoryView: View {
                     Section {
                         ForEach(filteredJobs) { job in
                             PrintHistoryRowView(job: job)
+                                .swipeActions(edge: .trailing) {
+                                    if job.status == .failed {
+                                        Button {
+                                            annotatingJob = job
+                                        } label: {
+                                            Label("Annotate", systemImage: "pencil")
+                                        }
+                                        .tint(.orange)
+                                    }
+
+                                    if job.status == .failed || job.status == .cancelled {
+                                        Button {
+                                            retryJob = job
+                                        } label: {
+                                            Label("Retry", systemImage: "arrow.clockwise")
+                                        }
+                                        .tint(.blue)
+                                    }
+                                }
+                                .swipeActions(edge: .leading) {
+                                    Button {
+                                        shareJobReport(job)
+                                    } label: {
+                                        Label("Report", systemImage: "doc.text")
+                                    }
+                                    .tint(.green)
+                                }
                         }
                         .onDelete(perform: deleteJobs)
                     } header: {
@@ -222,6 +253,63 @@ struct PrintHistoryView: View {
                     }
                 } label: {
                     Label("Filter", systemImage: "line.3.horizontal.decrease.circle")
+                }
+            }
+
+            ToolbarItem(placement: .secondaryAction) {
+                Button {
+                    exportToCSV()
+                } label: {
+                    Label("Export CSV", systemImage: "square.and.arrow.up")
+                }
+            }
+        }
+        .sheet(isPresented: $showingExportShare) {
+            if let url = exportURL {
+                ShareSheetView(items: [url])
+            }
+        }
+        .sheet(item: $annotatingJob) { job in
+            FailureAnnotationView(job: job)
+        }
+        .sheet(item: $retryJob) { job in
+            if let model = job.model {
+                PrintJobView(model: model, printers: retryPrinters(for: job))
+            }
+        }
+    }
+
+    /// Build a printer list for retry
+    private func retryPrinters(for job: PrintJob) -> [Printer] {
+        let descriptor = FetchDescriptor<Printer>()
+        return (try? modelContext.fetch(descriptor)) ?? []
+    }
+
+    /// Export filtered jobs to CSV and show share sheet
+    private func exportToCSV() {
+        Task {
+            let exporter = ExportService()
+            let csv = await exporter.exportJobsToCSV(jobs: filteredJobs)
+            let dateStr = Date().formatted(.dateTime.year().month().day())
+            if let url = await exporter.writeToTempFile(content: csv, fileName: "PrintHistory_\(dateStr).csv") {
+                await MainActor.run {
+                    exportURL = url
+                    showingExportShare = true
+                }
+            }
+        }
+    }
+
+    /// Generate and share a print report for a single job
+    private func shareJobReport(_ job: PrintJob) {
+        Task {
+            let exporter = ExportService()
+            let report = await exporter.generatePrintReport(job: job)
+            let fileName = "\(job.model?.name ?? "Print")_report.txt"
+            if let url = await exporter.writeToTempFile(content: report, fileName: fileName) {
+                await MainActor.run {
+                    exportURL = url
+                    showingExportShare = true
                 }
             }
         }
@@ -460,6 +548,18 @@ struct PrintHistoryRowView: View {
                         }
                     }
                     .foregroundStyle(.secondary)
+                }
+
+                // Failure annotation
+                if job.status == .failed, let reason = job.failureReason {
+                    HStack(spacing: 4) {
+                        Image(systemName: reason.icon)
+                            .font(.caption2)
+                        Text(reason.rawValue)
+                            .font(.caption)
+                            .fontWeight(.medium)
+                    }
+                    .foregroundStyle(.red.opacity(0.8))
                 }
             }
 

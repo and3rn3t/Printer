@@ -25,6 +25,8 @@ struct PrintJobView: View {
     @State private var uploadPhase: UploadPhase = .idle
     /// For ACT printers, the user must specify the filename as it exists on the printer's USB
     @State private var actFilename: String = ""
+    @Query(sort: \ResinProfile.name) private var resinProfiles: [ResinProfile]
+    @State private var selectedResinProfile: ResinProfile?
     
     enum UploadPhase: Equatable {
         case idle
@@ -75,6 +77,34 @@ struct PrintJobView: View {
                         LabeledContent("Protocol") {
                             Text(printer.printerProtocol == .act ? "ACT (TCP)" : "OctoPrint (HTTP)")
                                 .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+
+                // Material profile selection
+                if !resinProfiles.isEmpty {
+                    Section("Material") {
+                        Picker("Resin Profile", selection: $selectedResinProfile) {
+                            Text("None").tag(nil as ResinProfile?)
+                            ForEach(resinProfiles) { profile in
+                                HStack {
+                                    Circle()
+                                        .fill(Color(hex: profile.colorHex) ?? .gray)
+                                        .frame(width: 12, height: 12)
+                                    Text(profile.name)
+                                }
+                                .tag(profile as ResinProfile?)
+                            }
+                        }
+
+                        if let profile = selectedResinProfile, profile.costPerMl > 0,
+                           let volume = model.slicedVolumeMl, volume > 0 {
+                            let cost = Double(volume) * profile.costPerMl
+                            LabeledContent("Material Cost") {
+                                Text(cost, format: .currency(code: UserDefaults.standard.string(forKey: "resinCurrency") ?? "USD"))
+                                    .fontWeight(.semibold)
+                                    .foregroundStyle(.blue)
+                            }
                         }
                     }
                 }
@@ -345,6 +375,7 @@ struct PrintJobView: View {
                 jobProtocol: printer.printerProtocol.rawValue
             )
             job.model = model
+            job.resinProfile = selectedResinProfile
             model.printJobs.append(job)
             modelContext.insert(job)
             

@@ -278,6 +278,15 @@ final class PrintJob {
     /// Position in the print queue (0 = not queued, 1 = next, etc.)
     var queuePosition: Int
 
+    /// Resin/material profile used for this print
+    var resinProfile: ResinProfile?
+
+    /// Structured failure reason (only set when status == .failed)
+    var failureReason: FailureReason?
+
+    /// Free-text notes about the failure
+    var failureNotes: String?
+
     /// Duration of the print in a human-readable format
     var formattedDuration: String {
         let seconds = effectiveDuration
@@ -337,6 +346,41 @@ enum PrintStatus: Codable {
     case cancelled
 }
 
+/// Structured reason for a print failure.
+enum FailureReason: String, Codable, CaseIterable, Identifiable {
+    case adhesion = "Bed Adhesion"
+    case supportFailure = "Support Failure"
+    case fepDamage = "FEP Damage"
+    case layerShift = "Layer Shift"
+    case resinLeak = "Resin Leak"
+    case curing = "Curing Issue"
+    case fileCorrupt = "Corrupt File"
+    case networkError = "Network Error"
+    case printerError = "Printer Error"
+    case powerLoss = "Power Loss"
+    case userCancelled = "User Cancelled"
+    case other = "Other"
+
+    var id: String { rawValue }
+
+    var icon: String {
+        switch self {
+        case .adhesion: return "arrow.down.to.line"
+        case .supportFailure: return "building.columns"
+        case .fepDamage: return "film"
+        case .layerShift: return "arrow.left.arrow.right"
+        case .resinLeak: return "drop.triangle"
+        case .curing: return "sun.max"
+        case .fileCorrupt: return "doc.badge.ellipsis"
+        case .networkError: return "wifi.slash"
+        case .printerError: return "exclamationmark.triangle"
+        case .powerLoss: return "bolt.slash"
+        case .userCancelled: return "xmark.circle"
+        case .other: return "questionmark.circle"
+        }
+    }
+}
+
 /// Communication protocol used by a printer
 ///
 /// - `act`: Anycubic TCP protocol (Photon resin printers, port 6000)
@@ -377,6 +421,10 @@ final class Printer {
     
     /// Firmware version reported by printer
     var firmwareVersion: String?
+
+    /// Maintenance events logged for this printer
+    @Relationship(deleteRule: .cascade, inverse: \MaintenanceEvent.printer)
+    var maintenanceEvents: [MaintenanceEvent]
 
     /// Resin cost per milliliter for this printer (overrides global setting)
     var resinCostPerMl: Double?
@@ -425,6 +473,7 @@ final class Printer {
         self.port = port
         self.printerProtocol = printerProtocol
         self.isConnected = false
+        self.maintenanceEvents = []
     }
 }
 

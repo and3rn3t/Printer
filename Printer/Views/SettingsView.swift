@@ -59,6 +59,7 @@ struct SettingsView: View {
                 printingSection
                 notificationsSection
                 costSection
+                materialProfilesSection
                 iCloudSection
                 storageSection
                 dataSection
@@ -194,6 +195,20 @@ struct SettingsView: View {
             Label("Cost Tracking", systemImage: "dollarsign.circle")
         } footer: {
             Text("Set your resin cost per milliliter to see estimated costs on print jobs and statistics.")
+        }
+    }
+
+    private var materialProfilesSection: some View {
+        Section {
+            NavigationLink {
+                ResinProfileListView()
+            } label: {
+                Label("Material Profiles", systemImage: "drop.fill")
+            }
+        } header: {
+            Label("Materials", systemImage: "drop.fill")
+        } footer: {
+            Text("Define resin or filament profiles with cost and exposure settings to track per-material costs.")
         }
     }
 
