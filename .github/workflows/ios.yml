@@ -1,6 +1,12 @@
 # ──────────────────────────────────────────────────────────────
-# Printer — iOS CI
-# Builds, lints, and tests the Printer app on every push / PR.
+# Printer — iOS CI  (optimized)
+# Lints, builds, tests, and builds the widget — all in parallel.
+#
+# Key optimizations vs. previous version:
+#   • Shared composite action for Xcode / simulator / tool setup
+#   • Homebrew, SPM, and DerivedData caching
+#   • Merged build + test into one job (build-for-testing ➜ test-without-building)
+#   • All three jobs run in parallel (no serial build→test chain)
 # ──────────────────────────────────────────────────────────────
 
 name: iOS CI
@@ -28,9 +34,10 @@ env:
   SCHEME: Printer
   PROJECT: Printer.xcodeproj
   XCBEAUTIFY_OPTS: "--disable-colored-output"
+  DERIVED_DATA: build/DerivedData
 
 jobs:
-  # ── 1. SwiftLint ──────────────────────────────────────────
+  # ── 1. SwiftLint (parallel) ───────────────────────────────
   lint:
     name: SwiftLint
     runs-on: macos-15
@@ -39,71 +46,66 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install SwiftLint
-        run: brew install swiftlint
+      - name: Setup Xcode environment
+        uses: ./.github/actions/setup-xcode
+        with:
+          install-xcbeautify: "false"
+          install-swiftlint: "true"
 
       - name: Lint
         run: swiftlint lint --strict --config .swiftlint.yml --reporter github-actions-logging
 
-  # ── 2. Build ──────────────────────────────────────────────
-  build:
-    name: Build (iOS)
+  # ── 2. Build + Test (parallel) ────────────────────────────
+  build-and-test:
+    name: Build & Test (iOS)
     runs-on: macos-15
     timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Select Xcode
-        run: |
-          # Use the latest available Xcode on the runner
-          XCODE_PATH=$(ls -d /Applications/Xcode*.app 2>/dev/null | sort -V | tail -1)
-          echo "Using Xcode at: $XCODE_PATH"
-          sudo xcode-select -s "$XCODE_PATH"
-          xcodebuild -version
-          xcrun simctl list runtimes
+      - name: Setup Xcode environment
+        id: setup
+        uses: ./.github/actions/setup-xcode
 
-      - name: Resolve simulator destination
-        run: |
-          # Pick the best available iPhone simulator
-          DEST=$(xcrun simctl list devices available -j | python3 -c "
-          import json, sys
-          data = json.load(sys.stdin)
-          # Prefer iPhone 16, then any iPhone, sorted by runtime version
-          candidates = []
-          for runtime, devices in data['devices'].items():
-              for d in devices:
-                  if 'iPhone' in d['name'] and d['isAvailable']:
-                      candidates.append((runtime, d['name']))
-          candidates.sort(key=lambda x: x[0], reverse=True)
-          for runtime, name in candidates:
-              if 'iPhone 16' in name:
-                  print(name); sys.exit(0)
-          for runtime, name in candidates:
-              if 'iPhone' in name:
-                  print(name); sys.exit(0)
-          sys.exit(1)
-          ")
-          echo "Resolved simulator: $DEST"
-          echo "DESTINATION=platform=iOS Simulator,name=$DEST,OS=latest" >> "$GITHUB_ENV"
+      # ── SPM package cache ──────────────────────────────────
+      - name: Cache SPM packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Developer/Xcode/DerivedData/**/SourcePackages
+            ${{ env.DERIVED_DATA }}/SourcePackages
+          key: spm-${{ runner.os }}-${{ hashFiles('**/Package.resolved', '**/project.pbxproj') }}
+          restore-keys: |
+            spm-${{ runner.os }}-
 
-      - name: Install xcbeautify
-        run: brew install xcbeautify
+      # ── DerivedData cache ──────────────────────────────────
+      - name: Cache DerivedData
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.DERIVED_DATA }}
+          key: deriveddata-${{ runner.os }}-${{ hashFiles('**/*.swift', '**/project.pbxproj') }}
+          restore-keys: |
+            deriveddata-${{ runner.os }}-
 
       - name: Resolve package dependencies
         run: |
           xcodebuild -project "$PROJECT" \
             -scheme "$SCHEME" \
+            -derivedDataPath "$DERIVED_DATA" \
             -resolvePackageDependencies \
             2>&1 | xcbeautify $XCBEAUTIFY_OPTS
 
-      - name: Build for iOS Simulator
+      # build-for-testing compiles everything once; test-without-building
+      # re-uses those products — no redundant rebuild.
+      - name: Build for testing
         run: |
           set -o pipefail
-          xcodebuild build \
+          xcodebuild build-for-testing \
             -project "$PROJECT" \
             -scheme "$SCHEME" \
-            -destination "$DESTINATION" \
+            -destination "${{ steps.setup.outputs.destination }}" \
+            -derivedDataPath "$DERIVED_DATA" \
             -configuration Debug \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
@@ -111,61 +113,19 @@ jobs:
             COMPILER_INDEX_STORE_ENABLE=NO \
             2>&1 | xcbeautify $XCBEAUTIFY_OPTS
 
-  # ── 3. Test ───────────────────────────────────────────────
-  test:
-    name: Test (iOS)
-    runs-on: macos-15
-    needs: build
-    timeout-minutes: 30
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Select Xcode
-        run: |
-          XCODE_PATH=$(ls -d /Applications/Xcode*.app 2>/dev/null | sort -V | tail -1)
-          sudo xcode-select -s "$XCODE_PATH"
-          xcodebuild -version
-
-      - name: Resolve simulator destination
-        run: |
-          DEST=$(xcrun simctl list devices available -j | python3 -c "
-          import json, sys
-          data = json.load(sys.stdin)
-          candidates = []
-          for runtime, devices in data['devices'].items():
-              for d in devices:
-                  if 'iPhone' in d['name'] and d['isAvailable']:
-                      candidates.append((runtime, d['name']))
-          candidates.sort(key=lambda x: x[0], reverse=True)
-          for runtime, name in candidates:
-              if 'iPhone 16' in name:
-                  print(name); sys.exit(0)
-          for runtime, name in candidates:
-              if 'iPhone' in name:
-                  print(name); sys.exit(0)
-          sys.exit(1)
-          ")
-          echo "Resolved simulator: $DEST"
-          echo "DESTINATION=platform=iOS Simulator,name=$DEST,OS=latest" >> "$GITHUB_ENV"
-
-      - name: Install xcbeautify
-        run: brew install xcbeautify
-
-      - name: Run unit tests
+      - name: Run tests (without rebuilding)
         run: |
           set -o pipefail
-          xcodebuild test \
+          xcodebuild test-without-building \
             -project "$PROJECT" \
             -scheme "$SCHEME" \
-            -destination "$DESTINATION" \
-            -configuration Debug \
+            -destination "${{ steps.setup.outputs.destination }}" \
+            -derivedDataPath "$DERIVED_DATA" \
             -resultBundlePath TestResults.xcresult \
             -enableCodeCoverage YES \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
-            COMPILER_INDEX_STORE_ENABLE=NO \
             2>&1 | xcbeautify $XCBEAUTIFY_OPTS
 
       - name: Upload test results
@@ -177,7 +137,7 @@ jobs:
           retention-days: 14
           if-no-files-found: warn
 
-  # ── 4. Build Widget Extension ─────────────────────────────
+  # ── 3. Build Widget Extension (parallel) ──────────────────
   build-widget:
     name: Build Widget Extension
     runs-on: macos-15
@@ -186,35 +146,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Select Xcode
-        run: |
-          XCODE_PATH=$(ls -d /Applications/Xcode*.app 2>/dev/null | sort -V | tail -1)
-          sudo xcode-select -s "$XCODE_PATH"
+      - name: Setup Xcode environment
+        id: setup
+        uses: ./.github/actions/setup-xcode
 
-      - name: Resolve simulator destination
-        run: |
-          DEST=$(xcrun simctl list devices available -j | python3 -c "
-          import json, sys
-          data = json.load(sys.stdin)
-          candidates = []
-          for runtime, devices in data['devices'].items():
-              for d in devices:
-                  if 'iPhone' in d['name'] and d['isAvailable']:
-                      candidates.append((runtime, d['name']))
-          candidates.sort(key=lambda x: x[0], reverse=True)
-          for runtime, name in candidates:
-              if 'iPhone 16' in name:
-                  print(name); sys.exit(0)
-          for runtime, name in candidates:
-              if 'iPhone' in name:
-                  print(name); sys.exit(0)
-          sys.exit(1)
-          ")
-          echo "Resolved simulator: $DEST"
-          echo "DESTINATION=platform=iOS Simulator,name=$DEST,OS=latest" >> "$GITHUB_ENV"
-
-      - name: Install xcbeautify
-        run: brew install xcbeautify
+      # ── DerivedData cache (widget) ─────────────────────────
+      - name: Cache DerivedData (widget)
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.DERIVED_DATA }}
+          key: deriveddata-widget-${{ runner.os }}-${{ hashFiles('**/*.swift', '**/project.pbxproj') }}
+          restore-keys: |
+            deriveddata-widget-${{ runner.os }}-
 
       - name: Build widget extension
         run: |
@@ -222,7 +165,8 @@ jobs:
           xcodebuild build \
             -project "$PROJECT" \
             -scheme widgetExtension \
-            -destination "$DESTINATION" \
+            -destination "${{ steps.setup.outputs.destination }}" \
+            -derivedDataPath "$DERIVED_DATA" \
             -configuration Debug \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
