@@ -44,6 +44,7 @@ actor PrintablesService {
 
     // MARK: - Constants
 
+    // swiftlint:disable:next force_unwrapping
     private let endpoint = URL(string: "https://api.printables.com/graphql/")!
     private let session: URLSession
 
@@ -221,7 +222,12 @@ actor PrintablesService {
     func downloadFile(_ file: PrintablesFile, printId: String, fileType: String) async throws -> URL {
         // Step 1: Get signed download URL via mutation
         let mutation = """
-        mutation GetDownloadLink($printId: ID!, $fileType: DownloadFileTypeEnum, $source: DownloadSourceEnum!, $id: ID) {
+        mutation GetDownloadLink(
+            $printId: ID!,
+            $fileType: DownloadFileTypeEnum,
+            $source: DownloadSourceEnum!,
+            $id: ID
+        ) {
           getDownloadLink(printId: $printId, fileType: $fileType, source: $source, id: $id) {
             ok
             output {

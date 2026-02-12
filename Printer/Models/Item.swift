@@ -52,9 +52,9 @@ nonisolated enum ModelFileType: String, Codable, CaseIterable, Sendable {
     }
 
     /// Infer file type from a file path or URL
-    static func from(path: String) -> ModelFileType {
+    static func from(path: String) -> Self {
         let ext = (path as NSString).pathExtension.lowercased()
-        return ModelFileType(rawValue: ext) ?? .unknown
+        return Self(rawValue: ext) ?? .unknown
     }
 }
 
@@ -95,29 +95,31 @@ final class PrintModel {
     var name: String
     var createdDate: Date
     var modifiedDate: Date
-    
+
     /// Relative path to the STL file within the documents directory
     /// Stored as a relative path (e.g. "STLFiles/model.stl") so it survives container changes
     var fileURL: String
-    
+
     /// Resolves the stored relative path to an absolute URL
     var resolvedFileURL: URL {
-        let documentsDirectory = FileManager.default.urls(
+        guard let documentsDirectory = FileManager.default.urls(
             for: .documentDirectory,
             in: .userDomainMask
-        ).first!
+        ).first else {
+            fatalError("Documents directory not available")
+        }
         return documentsDirectory.appendingPathComponent(fileURL)
     }
-    
+
     /// Size in bytes
     var fileSize: Int64
-    
+
     /// Source of the model
     var source: ModelSource
-    
+
     /// Thumbnail image data (optional, stored externally for performance)
     @Attribute(.externalStorage) var thumbnailData: Data?
-    
+
     /// Notes about the model
     var notes: String
 
@@ -126,7 +128,7 @@ final class PrintModel {
 
     /// User-assigned tags for organization
     var tags: [String]
-    
+
     /// Print history
     @Relationship(deleteRule: .cascade)
     var printJobs: [PrintJob]
@@ -407,22 +409,22 @@ final class Printer {
     var model: String
     var lastConnected: Date?
     var isConnected: Bool
-    
+
     /// Serial number / CN from Anycubic discovery
     var serialNumber: String?
-    
+
     /// Port used for connection (default 6000 for ACT, 80 for OctoPrint, 18910 for Anycubic HTTP)
     var port: Int
-    
+
     /// Communication protocol — ACT for Photon resin printers, OctoPrint for FDM
     var printerProtocol: PrinterProtocol
-    
+
     /// Device ID for MQTT communication
     var deviceId: String?
-    
+
     /// Mode ID for MQTT communication
     var modeId: String?
-    
+
     /// Firmware version reported by printer
     var firmwareVersion: String?
 
@@ -480,4 +482,3 @@ final class Printer {
         self.maintenanceEvents = []
     }
 }
-

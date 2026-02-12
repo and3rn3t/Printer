@@ -140,7 +140,9 @@ actor PhotonPrinterService {
             connection.stateUpdateHandler = { state in
                 switch state {
                 case .failed(let error):
-                    AppLogger.network.error("ACT connection failed to \(ipAddress):\(port): \(error.localizedDescription)")
+                    AppLogger.network.error(
+                        "ACT connection failed to \(ipAddress):\(port): \(error.localizedDescription)"
+                    )
                     if resumeGuard.tryAcquire() {
                         connection.cancel()
                         continuation.resume(
@@ -191,13 +193,12 @@ actor PhotonPrinterService {
     }
 
     /// Read response data until we see ",end" terminator
-    private nonisolated func receiveResponse(
+    nonisolated private func receiveResponse(
         connection: NWConnection,
         buffer: Data = Data(),
         completion: @escaping @Sendable (Result<[String], Error>) -> Void
     ) {
-        connection.receive(minimumIncompleteLength: 1, maximumLength: 8192) {
-            content, _, isComplete, error in
+        connection.receive(minimumIncompleteLength: 1, maximumLength: 8192) { content, _, isComplete, error in
             if let error {
                 completion(.failure(PhotonError.connectionFailed(error.localizedDescription)))
                 return
@@ -362,7 +363,9 @@ actor PhotonPrinterService {
             AppLogger.network.info("ACT connection test succeeded for \(ipAddress):\(port)")
             return true
         } catch {
-            AppLogger.network.warning("ACT connection test failed for \(ipAddress):\(port): \(error.localizedDescription)")
+            AppLogger.network.warning(
+                "ACT connection test failed for \(ipAddress):\(port): \(error.localizedDescription)"
+            )
             return false
         }
     }

@@ -120,7 +120,9 @@ actor TimelapseCapture {
             // Compress to reduce storage (resize to max 640px wide)
             let imageData = compressSnapshot(data)
 
-            let progress = job.effectiveDuration > 0 ? min(100, (job.effectiveDuration / max(1, job.elapsedTime)) * 100) : 0
+            let progress = job.effectiveDuration > 0
+                ? min(100, (job.effectiveDuration / max(1, job.elapsedTime)) * 100)
+                : 0
 
             await MainActor.run {
                 let snapshot = PrintSnapshot(
@@ -151,7 +153,7 @@ actor TimelapseCapture {
                 let scale = maxWidth / image.size.width
                 let newSize = CGSize(width: maxWidth, height: image.size.height * scale)
                 let renderer = UIGraphicsImageRenderer(size: newSize)
-                let resized = renderer.jpegData(withCompressionQuality: 0.7) { ctx in
+                let resized = renderer.jpegData(withCompressionQuality: 0.7) { _ in
                     image.draw(in: CGRect(origin: .zero, size: newSize))
                 }
                 return resized

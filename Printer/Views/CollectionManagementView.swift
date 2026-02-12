@@ -186,14 +186,21 @@ struct NewCollectionView: View {
                             Button {
                                 selectedIcon = icon
                             } label: {
+                                let iconColor = Color(hex: selectedColor) ?? .blue
                                 Image(systemName: icon)
                                     .font(.title3)
                                     .frame(width: 40, height: 40)
-                                    .background(selectedIcon == icon ? (Color(hex: selectedColor) ?? .blue).opacity(0.2) : Color.clear)
+                                    .background(
+                                        selectedIcon == icon
+                                            ? iconColor.opacity(0.2) : Color.clear
+                                    )
                                     .clipShape(RoundedRectangle(cornerRadius: 8))
                                     .overlay(
                                         RoundedRectangle(cornerRadius: 8)
-                                            .strokeBorder(selectedIcon == icon ? (Color(hex: selectedColor) ?? .blue) : .clear, lineWidth: 2)
+                                            .strokeBorder(
+                                                selectedIcon == icon ? iconColor : .clear,
+                                                lineWidth: 2
+                                            )
                                     )
                             }
                             .buttonStyle(.plain)
@@ -289,14 +296,21 @@ struct EditCollectionView: View {
                             Button {
                                 selectedIcon = icon
                             } label: {
+                                let iconColor = Color(hex: selectedColor) ?? .blue
                                 Image(systemName: icon)
                                     .font(.title3)
                                     .frame(width: 40, height: 40)
-                                    .background(selectedIcon == icon ? (Color(hex: selectedColor) ?? .blue).opacity(0.2) : Color.clear)
+                                    .background(
+                                        selectedIcon == icon
+                                            ? iconColor.opacity(0.2) : Color.clear
+                                    )
                                     .clipShape(RoundedRectangle(cornerRadius: 8))
                                     .overlay(
                                         RoundedRectangle(cornerRadius: 8)
-                                            .strokeBorder(selectedIcon == icon ? (Color(hex: selectedColor) ?? .blue) : .clear, lineWidth: 2)
+                                            .strokeBorder(
+                                                selectedIcon == icon ? iconColor : .clear,
+                                                lineWidth: 2
+                                            )
                                     )
                             }
                             .buttonStyle(.plain)
@@ -429,7 +443,7 @@ struct AddToCollectionPicker: View {
                 } else {
                     List {
                         ForEach(collections) { collection in
-                            let isInCollection = collection.models.contains(where: { $0.id == model.id })
+                            let isInCollection = collection.models.contains { $0.id == model.id }
 
                             Button {
                                 withAnimation {

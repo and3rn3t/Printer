@@ -88,7 +88,10 @@ struct SettingsView: View {
                 Button("Cancel", role: .cancel) { }
                 Button("Delete All", role: .destructive) { deleteAllModels() }
             } message: {
-                Text("This will permanently delete all \(models.count) models and their associated files. This cannot be undone.")
+                Text(
+                    "This will permanently delete all \(models.count) models and their associated files. "
+                    + "This cannot be undone."
+                )
             }
             .alert("Clear Print History", isPresented: $showingClearHistoryConfirm) {
                 Button("Cancel", role: .cancel) { }
@@ -253,7 +256,10 @@ struct SettingsView: View {
         } header: {
             Label("Materials", systemImage: "drop.fill")
         } footer: {
-            Text("Define resin or filament profiles with cost and exposure settings. Track physical stock levels in inventory.")
+            Text(
+                "Define resin or filament profiles with cost and exposure settings. "
+                + "Track physical stock levels in inventory."
+            )
         }
     }
 
@@ -283,7 +289,10 @@ struct SettingsView: View {
         } header: {
             Label("iCloud", systemImage: "icloud")
         } footer: {
-            Text("Sync your model library metadata across devices via iCloud. Large model files are synced to iCloud Documents.")
+            Text(
+                "Sync your model library metadata across devices via iCloud. "
+                + "Large model files are synced to iCloud Documents."
+            )
         }
         .task {
             if enableICloudSync {
@@ -413,7 +422,9 @@ struct SettingsView: View {
 
     private func calculateStorage() {
         Task {
-            let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+            guard let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
+                return
+            }
             let stlDir = documentsURL.appendingPathComponent("STLFiles")
 
             var totalSize: Int64 = 0
@@ -591,11 +602,6 @@ struct SettingsView: View {
 
 #Preview {
     let config = ModelConfiguration(isStoredInMemoryOnly: true)
+    // swiftlint:disable:next force_try
     let container = try! ModelContainer(
-        for: PrintModel.self, PrintJob.self, Printer.self,
-        configurations: config
-    )
-
-    return SettingsView()
-        .modelContainer(container)
 }

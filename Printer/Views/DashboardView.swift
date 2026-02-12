@@ -48,7 +48,7 @@ struct DashboardView: View {
                 if let status = state.photonStatus, status == .printing || status == .paused {
                     return true
                 }
-                if state.progress != nil && state.progress! > 0 && state.progress! < 1.0 {
+                if let progress = state.progress, progress > 0, progress < 1.0 {
                     return true
                 }
             }
@@ -438,7 +438,7 @@ struct DashboardView: View {
 
     private var totalSpendThisMonth: Double {
         let cal = Calendar.current
-        let start = cal.date(from: cal.dateComponents([.year, .month], from: Date()))!
+        let start = cal.date(from: cal.dateComponents([.year, .month], from: Date())) ?? Date()
         guard resinCostPerMl > 0 else { return 0 }
         return allJobs
             .filter { $0.status == .completed && $0.startDate >= start }
@@ -465,7 +465,11 @@ struct DashboardView: View {
                     .fontWeight(.medium)
                 if monthlyBudget > 0 {
                     let remaining = monthlyBudget - totalSpendThisMonth
-                    Text(remaining >= 0 ? "\(costCurrencySymbol)\(String(format: "%.2f", remaining)) remaining" : "Over budget!")
+                    Text(
+                        remaining >= 0
+                            ? "\(costCurrencySymbol)\(String(format: "%.2f", remaining)) remaining"
+                            : "Over budget!"
+                    )
                         .font(.caption)
                         .foregroundStyle(remaining >= 0 ? .green : .red)
                 }

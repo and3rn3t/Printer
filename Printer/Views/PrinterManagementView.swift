@@ -13,10 +13,10 @@ struct PrinterManagementView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @Query private var printers: [Printer]
-    
+
     @State private var showingAddPrinter = false
     @State private var networkMonitor = NetworkMonitor()
-    
+
     var body: some View {
         NavigationStack {
             Group {
@@ -46,7 +46,7 @@ struct PrinterManagementView: View {
                                 }
                             }
                         }
-                        
+
                         Section {
                             ForEach(printers) { printer in
                                 NavigationLink(destination: PrinterDetailView(printer: printer)) {
@@ -65,7 +65,7 @@ struct PrinterManagementView: View {
                         dismiss()
                     }
                 }
-                
+
                 ToolbarItem(placement: .primaryAction) {
                     Button {
                         showingAddPrinter = true
@@ -79,7 +79,7 @@ struct PrinterManagementView: View {
             }
         }
     }
-    
+
     private func deletePrinters(offsets: IndexSet) {
         withAnimation {
             for index in offsets {
@@ -236,20 +236,20 @@ struct PrinterRowView: View {
 struct AddPrinterView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
-    
+
     @State private var name = ""
     @State private var ipAddress = ""
     @State private var apiKey = ""
     @State private var model = ""
-    
+
     @State private var isTestingConnection = false
     @State private var connectionTestResult: Result<Bool, Error>?
-    
+
     // Discovery
     @State private var discovery = PrinterDiscovery()
     @State private var showingDiscovery = false
     @State private var selectedDiscoveredPrinter: DiscoveredPrinter?
-    
+
     var body: some View {
         NavigationStack {
             Form {
@@ -270,7 +270,7 @@ struct AddPrinterView: View {
                                 .foregroundStyle(.blue)
                         }
                     }
-                    
+
                     if let selected = selectedDiscoveredPrinter {
                         HStack {
                             Image(systemName: "checkmark.circle.fill")
@@ -285,7 +285,7 @@ struct AddPrinterView: View {
                         }
                     }
                 }
-                
+
                 Section("Printer Information") {
                     TextField("Name", text: $name)
                     TextField("IP Address", text: $ipAddress)
@@ -296,20 +296,20 @@ struct AddPrinterView: View {
                         .onChange(of: ipAddress) { _, _ in
                             connectionTestResult = nil
                         }
-                    
+
                     if !ipAddress.isEmpty && !isValidIPAddress(ipAddress) {
                         Label("Enter a valid IPv4 address (e.g. 192.168.1.49)", systemImage: "exclamationmark.triangle")
                             .font(.caption)
                             .foregroundStyle(.orange)
                     }
-                    
+
                     TextField("Model (Optional)", text: $model)
                 }
-                
+
                 Section("Authentication") {
                     TextField("API Key (Optional)", text: $apiKey)
                 }
-                
+
                 Section {
                     Button {
                         testConnection()
@@ -326,7 +326,7 @@ struct AddPrinterView: View {
                         }
                     }
                     .disabled(ipAddress.isEmpty || !isValidIPAddress(ipAddress) || isTestingConnection)
-                    
+
                     if let result = connectionTestResult {
                         switch result {
                         case .success(let connected):
@@ -335,7 +335,7 @@ struct AddPrinterView: View {
                                 systemImage: connected ? "checkmark.circle.fill" : "xmark.circle.fill"
                             )
                             .foregroundStyle(connected ? .green : .red)
-                            
+
                         case .failure(let error):
                             Label(error.localizedDescription, systemImage: "exclamationmark.triangle.fill")
                                 .foregroundStyle(.orange)
@@ -353,7 +353,7 @@ struct AddPrinterView: View {
                         dismiss()
                     }
                 }
-                
+
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Add") {
                         addPrinter()
@@ -372,16 +372,16 @@ struct AddPrinterView: View {
             }
         }
     }
-    
-    private func testConnection() {
+
+    func testConnection() {
         isTestingConnection = true
         connectionTestResult = nil
-        
+
         Task {
             do {
                 let api = AnycubicPrinterAPI.shared
                 let connected = try await api.testConnection(ipAddress: ipAddress)
-                
+
                 await MainActor.run {
                     connectionTestResult = .success(connected)
                     isTestingConnection = false
@@ -394,7 +394,7 @@ struct AddPrinterView: View {
             }
         }
     }
-    
+
     private func addPrinter() {
         // Determine protocol based on discovery method
         let printerProtocol: PrinterProtocol
@@ -415,7 +415,7 @@ struct AddPrinterView: View {
             printerProtocol = .act  // Default to ACT for Anycubic printers
             port = PhotonPrinterService.defaultPort
         }
-        
+
         let printer = Printer(
             name: name,
             ipAddress: ipAddress,
@@ -425,12 +425,12 @@ struct AddPrinterView: View {
             port: port,
             printerProtocol: printerProtocol
         )
-        
+
         // Populate discovery data if available
         if let discovered = selectedDiscoveredPrinter {
             printer.serialNumber = discovered.serialNumber
         }
-        
+
         modelContext.insert(printer)
         dismiss()
     }
@@ -442,9 +442,9 @@ struct PrinterDiscoveryView: View {
     @Environment(\.dismiss) private var dismiss
     @Bindable var discovery: PrinterDiscovery
     let onSelect: (DiscoveredPrinter) -> Void
-    
+
     @State private var subnetIP = ""
-    
+
     var body: some View {
         NavigationStack {
             List {
@@ -456,13 +456,13 @@ struct PrinterDiscoveryView: View {
                         Label("Bonjour Scan", systemImage: "bonjour")
                     }
                     .disabled(discovery.isScanning)
-                    
+
                     HStack {
                         TextField("Subnet (e.g. 192.168.1.1)", text: $subnetIP)
                             #if os(iOS)
                             .keyboardType(.decimalPad)
                             #endif
-                        
+
                         Button {
                             discovery.scanSubnet(baseIP: subnetIP.isEmpty ? nil : subnetIP)
                         } label: {
@@ -470,7 +470,7 @@ struct PrinterDiscoveryView: View {
                         }
                         .disabled(discovery.isScanning)
                     }
-                    
+
                     if discovery.isScanning {
                         VStack(spacing: 8) {
                             ProgressView(value: discovery.scanProgress)
@@ -482,7 +482,7 @@ struct PrinterDiscoveryView: View {
                 } header: {
                     Text("Discovery Methods")
                 }
-                
+
                 // Results
                 Section {
                     if discovery.discoveredPrinters.isEmpty && !discovery.isScanning {
@@ -501,11 +501,11 @@ struct PrinterDiscoveryView: View {
                                         Text(printer.name)
                                             .font(.headline)
                                             .foregroundStyle(.primary)
-                                        
+
                                         Text(printer.ipAddress)
                                             .font(.caption)
                                             .foregroundStyle(.secondary)
-                                        
+
                                         HStack(spacing: 4) {
                                             Image(systemName: discoveryIcon(for: printer.discoveryMethod))
                                                 .font(.caption2)
@@ -514,15 +514,15 @@ struct PrinterDiscoveryView: View {
                                         }
                                         .foregroundStyle(.secondary)
                                     }
-                                    
+
                                     Spacer()
-                                    
+
                                     if !printer.model.isEmpty {
                                         Text(printer.model)
                                             .font(.caption)
                                             .foregroundStyle(.secondary)
                                     }
-                                    
+
                                     Image(systemName: "chevron.right")
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
@@ -538,7 +538,7 @@ struct PrinterDiscoveryView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
-                
+
                 if let error = discovery.lastError {
                     Section {
                         Label(error, systemImage: "exclamationmark.triangle")
@@ -564,7 +564,7 @@ struct PrinterDiscoveryView: View {
             }
         }
     }
-    
+
     private func discoveryIcon(for method: DiscoveredPrinter.DiscoveryMethod) -> String {
         switch method {
         case .bonjour: return "bonjour"

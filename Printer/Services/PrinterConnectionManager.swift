@@ -179,7 +179,9 @@ final class PrinterConnectionManager {
             failedPolls += 1
             successfulPolls = 0
             let failCount = self.failedPolls
-            AppLogger.network.warning("Status poll failed for \(printer.name) (attempt \(failCount)): \(error.localizedDescription)")
+            AppLogger.network.warning(
+                "Status poll failed for \(printer.name) (attempt \(failCount)): \(error.localizedDescription)"
+            )
 
             if failedPolls >= 3 {
                 connectionState = .error(error.localizedDescription)
@@ -230,7 +232,9 @@ final class PrinterConnectionManager {
                     self.estimatedTimeRemaining = max(Int(totalSeconds - elapsed), 0)
 
                     // "Finishing soon" notification when < 10 minutes remain
-                    if let remaining = self.estimatedTimeRemaining, remaining > 0, remaining < 600, !self.finishingSoonNotified {
+                    if let remaining = self.estimatedTimeRemaining,
+                       remaining > 0, remaining < 600,
+                       !self.finishingSoonNotified {
                         self.finishingSoonNotified = true
                         PrintNotificationManager.shared.notifyPrintFinishingSoon(
                             fileName: job.fileName,
@@ -398,7 +402,11 @@ final class PrinterConnectionManager {
         switch (old, newStatus) {
         case (nil, .printing), (.idle, .printing), (.stopping, .printing):
             // Print started
-            startPrintSession(printerName: printer.name, printerIP: printer.ipAddress, protocol: printer.printerProtocol)
+            startPrintSession(
+                printerName: printer.name,
+                printerIP: printer.ipAddress,
+                protocol: printer.printerProtocol
+            )
 
         case (.printing, .paused):
             // Print paused — record elapsed so far
@@ -426,7 +434,11 @@ final class PrinterConnectionManager {
         guard let printer else { return }
 
         if old != "Printing" && newState == "Printing" {
-            startPrintSession(printerName: printer.name, printerIP: printer.ipAddress, protocol: printer.printerProtocol)
+            startPrintSession(
+                printerName: printer.name,
+                printerIP: printer.ipAddress,
+                protocol: printer.printerProtocol
+            )
         } else if old == "Printing" && newState != "Printing" && newState != "Paused" && newState != "Pausing" {
             let finalStatus: PrintStatus = (newState == "Operational") ? .completed : .failed
             completePrintSession(status: finalStatus)
@@ -559,8 +571,12 @@ final class PrinterConnectionManager {
         let captureAPI = AnycubicPrinterAPI.shared
 
         Task {
-            guard let snapshotURL = await captureAPI.getWebcamSnapshotURL(ipAddress: printerIP, apiKey: apiKey) else { return }
-            await TimelapseCapture.shared.startCapture(snapshotURL: snapshotURL, job: job, modelContext: context)
+            guard let snapshotURL = await captureAPI.getWebcamSnapshotURL(
+                ipAddress: printerIP, apiKey: apiKey
+            ) else { return }
+            await TimelapseCapture.shared.startCapture(
+                snapshotURL: snapshotURL, job: job, modelContext: context
+            )
         }
     }
 

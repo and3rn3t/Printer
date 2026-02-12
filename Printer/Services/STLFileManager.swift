@@ -11,11 +11,11 @@ import OSLog
 
 /// Manages STL file operations including import, export, and storage
 actor STLFileManager {
-    
+
     static let shared = STLFileManager()
-    
+
     private let fileManager = FileManager.default
-    
+
     /// Directory for storing STL files
     private var stlDirectory: URL {
         get throws {
@@ -26,49 +26,49 @@ actor STLFileManager {
                 create: true
             )
             let stlDir = documentsDirectory.appendingPathComponent("STLFiles", isDirectory: true)
-            
+
             if !fileManager.fileExists(atPath: stlDir.path) {
                 try fileManager.createDirectory(at: stlDir, withIntermediateDirectories: true)
             }
-            
+
             return stlDir
         }
     }
-    
+
     /// Import an STL file from a URL
     func importSTL(from sourceURL: URL) async throws -> (url: URL, size: Int64) {
         let destinationURL = try stlDirectory
             .appendingPathComponent(sourceURL.lastPathComponent)
-        
+
         // If file exists, make it unique
         let uniqueURL = try makeUniqueURL(destinationURL)
-        
+
         // Copy the file
         try fileManager.copyItem(at: sourceURL, to: uniqueURL)
-        
+
         // Get file size
         let attributes = try fileManager.attributesOfItem(atPath: uniqueURL.path)
         let fileSize = attributes[.size] as? Int64 ?? 0
-        
+
         return (uniqueURL, fileSize)
     }
-    
+
     /// Delete an STL file
     func deleteSTL(at path: String) async throws {
         let url = URL(fileURLWithPath: path)
         try fileManager.removeItem(at: url)
     }
-    
+
     /// Check if STL file exists
     func fileExists(at path: String) -> Bool {
         fileManager.fileExists(atPath: path)
     }
-    
+
     /// Create a unique filename if one already exists
     private func makeUniqueURL(_ url: URL) throws -> URL {
         var uniqueURL = url
         var counter = 1
-        
+
         while fileManager.fileExists(atPath: uniqueURL.path) {
             let filename = url.deletingPathExtension().lastPathComponent
             let ext = url.pathExtension
@@ -77,10 +77,10 @@ actor STLFileManager {
                 .appendingPathExtension(ext)
             counter += 1
         }
-        
+
         return uniqueURL
     }
-    
+
     /// Convert an absolute file URL to a relative path (relative to Documents directory)
     /// for stable storage in SwiftData
     func relativePath(for url: URL) -> String {
@@ -101,18 +101,18 @@ actor STLFileManager {
         }
         return url.lastPathComponent
     }
-    
+
 }
 
 extension UTType {
     static var stl: UTType {
         UTType(filenameExtension: "stl") ?? .data
     }
-    
+
     static var obj: UTType {
         UTType(filenameExtension: "obj") ?? .threeDContent
     }
-    
+
     static var usdz: UTType {
         UTType(filenameExtension: "usdz") ?? .usdz
     }

@@ -13,7 +13,7 @@ import SwiftUI
 /// Only available for OctoPrint printers (not ACT protocol).
 struct PrinterFileBrowserView: View {
     let printer: Printer
-    
+
     @State private var files: [PrinterFile] = []
     @State private var isLoading = false
     @State private var errorMessage: String?
@@ -21,7 +21,7 @@ struct PrinterFileBrowserView: View {
     @State private var fileToDelete: PrinterFile?
     @State private var showingDeleteConfirm = false
     @State private var isPrinting = false
-    
+
     var body: some View {
         Group {
             if isLoading && files.isEmpty {
@@ -85,13 +85,13 @@ struct PrinterFileBrowserView: View {
             }
         }
     }
-    
+
     // MARK: - Actions
-    
+
     private func loadFiles() async {
         isLoading = true
         defer { isLoading = false }
-        
+
         do {
             let api = AnycubicPrinterAPI.shared
             let result = try await api.listFiles(
@@ -104,7 +104,7 @@ struct PrinterFileBrowserView: View {
             showingError = true
         }
     }
-    
+
     private func startPrint(file: PrinterFile) {
         isPrinting = true
         Task {
@@ -124,7 +124,7 @@ struct PrinterFileBrowserView: View {
             }
         }
     }
-    
+
     private func deleteFile(_ file: PrinterFile) {
         Task {
             do {
@@ -149,27 +149,27 @@ struct PrinterFileRow: View {
     let file: PrinterFile
     let onPrint: () -> Void
     let onDelete: () -> Void
-    
+
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: fileIcon)
                 .font(.title2)
                 .foregroundStyle(.blue)
                 .frame(width: 36)
-            
+
             VStack(alignment: .leading, spacing: 4) {
                 Text(file.name)
                     .font(.subheadline)
                     .fontWeight(.medium)
                     .lineLimit(1)
-                
+
                 HStack(spacing: 8) {
                     if let size = file.size {
                         Text(ByteCountFormatter.string(fromByteCount: size, countStyle: .file))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
-                    
+
                     if let date = file.date {
                         Text(date.formatted(date: .abbreviated, time: .shortened))
                             .font(.caption)
@@ -177,7 +177,7 @@ struct PrinterFileRow: View {
                     }
                 }
             }
-            
+
             Spacer()
         }
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
@@ -186,7 +186,7 @@ struct PrinterFileRow: View {
             } label: {
                 Label("Delete", systemImage: "trash")
             }
-            
+
             Button {
                 onPrint()
             } label: {
@@ -200,7 +200,7 @@ struct PrinterFileRow: View {
             } label: {
                 Label("Print", systemImage: "printer")
             }
-            
+
             Button(role: .destructive) {
                 onDelete()
             } label: {
@@ -208,7 +208,7 @@ struct PrinterFileRow: View {
             }
         }
     }
-    
+
     private var fileIcon: String {
         let ext = (file.name as NSString).pathExtension.lowercased()
         switch ext {

@@ -86,7 +86,11 @@ struct MaintenanceScheduler {
                 guard lastEvent.reminderIntervalDays > 0 else { continue }
                 guard let nextDue = lastEvent.nextDueDate else { continue }
 
-                let daysLeft = calendar.dateComponents([.day], from: calendar.startOfDay(for: now), to: calendar.startOfDay(for: nextDue)).day ?? 0
+                let daysLeft = calendar.dateComponents(
+                    [.day],
+                    from: calendar.startOfDay(for: now),
+                    to: calendar.startOfDay(for: nextDue)
+                ).day ?? 0
 
                 // Only surface alerts that are due within 14 days or overdue
                 if daysLeft <= 14 {

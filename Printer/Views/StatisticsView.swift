@@ -176,7 +176,7 @@ struct StatisticsView: View {
                         }
                     }
 
-                    if filteredJobs.count > 0 {
+                    if !filteredJobs.isEmpty {
                         Divider()
                         Text("\(successRate)% success rate")
                             .font(.caption)
@@ -351,7 +351,9 @@ struct StatisticsView: View {
     }
 
     private var successRate: Int {
-        let finished = filteredJobs.filter { $0.status == .completed || $0.status == .failed || $0.status == .cancelled }
+        let finished = filteredJobs.filter {
+            $0.status == .completed || $0.status == .failed || $0.status == .cancelled
+        }
         guard !finished.isEmpty else { return 0 }
         return Int(Double(completedCount) / Double(finished.count) * 100)
     }

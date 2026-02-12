@@ -174,7 +174,8 @@ struct PrintJobView: View {
                     Section {
                         Label {
                             Text(
-                                "No print estimate available — this file has not been sliced. Slice it in your slicer software to see time, layer, and cost estimates."
+                                "No print estimate available — this file has not been sliced. "
+                                + "Slice it in your slicer software to see time, layer, and cost estimates."
                             )
                             .font(.caption)
                         } icon: {
@@ -227,7 +228,9 @@ struct PrintJobView: View {
                             .foregroundStyle(.orange)
 
                             Text(
-                                "This printer uses the ACT protocol. Files cannot be uploaded over the network — they must be copied to USB manually. Enter the filename as it appears on the printer's USB drive to start printing."
+                                "This printer uses the ACT protocol. Files cannot be uploaded over the network "
+                                + "— they must be copied to USB manually. Enter the filename as it appears on "
+                                + "the printer's USB drive to start printing."
                             )
                             .font(.caption)
                             .foregroundStyle(.secondary)

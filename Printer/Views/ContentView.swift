@@ -81,7 +81,7 @@ struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \PrintModel.modifiedDate, order: .reverse) private var models: [PrintModel]
     @Query private var printers: [Printer]
-    
+
     @State private var selectedModel: PrintModel?
     @State private var showingScanner = false
     @State private var showingImporter = false
@@ -256,47 +256,49 @@ struct ContentView: View {
             }
         }
     }
-    
+
     private func deleteModels(offsets: IndexSet) {
         withAnimation {
             for index in offsets {
                 let model = models[index]
-                
+
                 // Delete the file
                 Task {
                     do {
                         try await STLFileManager.shared.deleteSTL(at: model.resolvedFileURL.path)
                     } catch {
-                        AppLogger.fileOps.error("Failed to delete file for \(model.name): \(error.localizedDescription)")
+                        AppLogger.fileOps.error(
+                            "Failed to delete file for \(model.name): \(error.localizedDescription)"
+                        )
                     }
                 }
-                
+
                 modelContext.delete(model)
             }
         }
     }
-    
+
     private func handleScannedModel(url: URL) async {
         do {
             // Convert if needed (USDZ to STL)
             let converter = ModelConverter()
             let stlURL: URL
-            
+
             if url.pathExtension.lowercased() == "usdz" {
                 stlURL = try await converter.convertUSDZToSTL(usdzURL: url)
             } else {
                 stlURL = url
             }
-            
+
             // Import the file
             let (fileURL, fileSize) = try await STLFileManager.shared.importSTL(from: stlURL)
-            
+
             // Generate thumbnail
             let thumbnailData = try? await converter.generateThumbnail(from: fileURL)
-            
+
             // Store as relative path for container resilience
             let relativePath = await STLFileManager.shared.relativePath(for: fileURL)
-            
+
             // Create model entry
             await MainActor.run {
                 let model = PrintModel(
@@ -306,7 +308,7 @@ struct ContentView: View {
                     source: .scanned,
                     thumbnailData: thumbnailData
                 )
-                
+
                 modelContext.insert(model)
                 selectedModel = model
             }
@@ -317,15 +319,15 @@ struct ContentView: View {
             }
         }
     }
-    
+
     private func handleImportedFiles(result: Result<[URL], Error>) async {
         do {
             let urls = try result.get()
-            
+
             for url in urls {
                 guard url.startAccessingSecurityScopedResource() else { continue }
                 defer { url.stopAccessingSecurityScopedResource() }
-                
+
                 let model = try await importModelFile(url: url, into: modelContext)
                 await MainActor.run {
                     selectedModel = model
@@ -398,7 +400,7 @@ struct ModelListView: View {
             result = result.filter {
                 $0.name.lowercased().contains(query) ||
                 $0.notes.lowercased().contains(query) ||
-                $0.tags.contains(where: { $0.lowercased().contains(query) })
+                $0.tags.contains { $0.lowercased().contains(query) }
             }
         }
 
@@ -415,29 +417,29 @@ struct ModelListView: View {
 
         return result
     }
-    
+
     var body: some View {
         Group {
             if models.isEmpty {
                 // Empty state
                 VStack(spacing: 24) {
                     Spacer()
-                    
+
                     Image(systemName: "cube.transparent")
                         .font(.system(size: 70))
                         .foregroundStyle(.blue.gradient)
-                    
+
                     VStack(spacing: 8) {
                         Text("No Models Yet")
                             .font(.title2)
                             .fontWeight(.semibold)
-                        
+
                         Text("Start by scanning an object or importing a file")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                             .multilineTextAlignment(.center)
                     }
-                    
+
                     VStack(spacing: 12) {
                         Button {
                             actions.showScanner()
@@ -450,7 +452,7 @@ struct ModelListView: View {
                         }
                         .buttonStyle(.borderedProminent)
                         .controlSize(.large)
-                        
+
                         Button {
                             actions.showImporter()
                         } label: {
@@ -463,7 +465,7 @@ struct ModelListView: View {
                         .buttonStyle(.bordered)
                         .controlSize(.large)
                     }
-                    
+
                     Spacer()
                 }
                 .padding()
@@ -776,10 +778,8 @@ struct ModelListView: View {
         let trimmed = tag.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return }
         let selected = models.filter { selectedModelIDs.contains($0.id) }
-        for model in selected {
-            if !model.tags.contains(trimmed) {
-                model.tags.append(trimmed)
-            }
+        for model in selected where !model.tags.contains(trimmed) {
+            model.tags.append(trimmed)
         }
     }
 
@@ -813,7 +813,9 @@ struct ModelListView: View {
                 do {
                     try await importModelFile(url: url, into: context)
                 } catch {
-                    AppLogger.fileOps.error("Drag-and-drop import failed for \(url.lastPathComponent): \(error.localizedDescription)")
+                    AppLogger.fileOps.error(
+                        "Drag-and-drop import failed for \(url.lastPathComponent): \(error.localizedDescription)"
+                    )
                 }
             }
         }
@@ -875,10 +877,8 @@ struct BatchAddToCollectionView: View {
     private func addToCollection(_ collection: ModelCollection) {
         let selected = allModels.filter { modelIDs.contains($0.id) }
         let existingIDs = Set(collection.models.map(\.id))
-        for model in selected {
-            if !existingIDs.contains(model.id) {
-                collection.models.append(model)
-            }
+        for model in selected where !existingIDs.contains(model.id) {
+            collection.models.append(model)
         }
         collection.modifiedDate = Date()
     }
@@ -888,7 +888,7 @@ struct BatchAddToCollectionView: View {
 
 struct ModelRowView: View {
     let model: PrintModel
-    
+
     var body: some View {
         HStack(spacing: 12) {
             // Thumbnail with gradient placeholder
@@ -914,7 +914,7 @@ struct ModelRowView: View {
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
-                        
+
                         Image(systemName: "cube.transparent")
                             .font(.title2)
                             .foregroundStyle(.white)
@@ -934,12 +934,12 @@ struct ModelRowView: View {
                         .offset(x: 4, y: -4)
                 }
             }
-            
+
             VStack(alignment: .leading, spacing: 6) {
                 Text(model.name)
                     .font(.headline)
                     .lineLimit(1)
-                
+
                 HStack(spacing: 8) {
                     Label {
                         Text(model.source.displayText)
@@ -948,11 +948,11 @@ struct ModelRowView: View {
                     }
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                    
+
                     Text("•")
                         .foregroundStyle(.secondary)
                         .font(.caption)
-                    
+
                     Text(ByteCountFormatter.string(fromByteCount: model.fileSize, countStyle: .file))
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -979,7 +979,7 @@ struct ModelRowView: View {
                             .clipShape(Capsule())
                     }
                 }
-                
+
                 if !model.printJobs.isEmpty {
                     HStack(spacing: 4) {
                         Image(systemName: "printer.fill")
@@ -990,21 +990,16 @@ struct ModelRowView: View {
                     .foregroundStyle(.blue)
                 }
             }
-            
+
             Spacer()
         }
         .padding(.vertical, 8)
     }
-    
+
 }
 
 #Preview {
     let config = ModelConfiguration(isStoredInMemoryOnly: true)
+    // swiftlint:disable:next force_try
     let container = try! ModelContainer(
-        for: PrintModel.self, PrintJob.self, Printer.self,
-        configurations: config
-    )
-    
-    return ContentView()
-        .modelContainer(container)
 }

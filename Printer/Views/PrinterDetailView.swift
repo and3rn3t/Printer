@@ -196,7 +196,11 @@ struct PrinterDetailView: View {
                         Text("USB File Transfer Required")
                             .font(.subheadline)
                             .fontWeight(.medium)
-                        Text("Resin printers using the ACT protocol do not support wireless file transfer. Copy sliced files (.pwmx) to a USB drive and insert it into the printer. Then use \"Send to Printer\" to start the print by filename.")
+                        Text(
+                            "Resin printers using the ACT protocol do not support wireless file transfer. "
+                            + "Copy sliced files (.pwmx) to a USB drive and insert it into the printer. "
+                            + "Then use \"Send to Printer\" to start the print by filename."
+                        )
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -231,7 +235,11 @@ struct PrinterDetailView: View {
                                 .foregroundStyle(alert.isOverdue ? .red : .orange)
                         }
                         Spacer()
-                        Image(systemName: alert.isOverdue ? "exclamationmark.circle.fill" : "clock.badge.exclamationmark")
+                        Image(
+                            systemName: alert.isOverdue
+                                ? "exclamationmark.circle.fill"
+                                : "clock.badge.exclamationmark"
+                        )
                             .foregroundStyle(alert.isOverdue ? .red : .orange)
                     }
                 }

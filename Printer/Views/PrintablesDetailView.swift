@@ -75,6 +75,7 @@ struct PrintablesDetailView: View {
     // MARK: - Detail Content
 
     @ViewBuilder
+    // swiftlint:disable:next cyclomatic_complexity
     private func detailContent(_ model: PrintablesModelDetail) -> some View {
         List {
             // Image gallery
@@ -112,7 +113,12 @@ struct PrintablesDetailView: View {
             Section("Stats") {
                 HStack(spacing: 24) {
                     statItem(icon: "heart.fill", value: "\(model.likesCount)", label: "Likes", color: .pink)
-                    statItem(icon: "arrow.down.circle.fill", value: "\(model.downloadCount)", label: "Downloads", color: .blue)
+                    statItem(
+                        icon: "arrow.down.circle.fill",
+                        value: "\(model.downloadCount)",
+                        label: "Downloads",
+                        color: .blue
+                    )
                     statItem(icon: "wrench.fill", value: "\(model.makesCount)", label: "Makes", color: .orange)
                 }
                 .frame(maxWidth: .infinity)
@@ -145,9 +151,11 @@ struct PrintablesDetailView: View {
 
                         Spacer()
 
-                        Link(destination: URL(string: "https://www.printables.com/@\(user.handle)")!) {
-                            Label("Profile", systemImage: "arrow.up.right.square")
-                                .font(.caption)
+                        if let profileURL = URL(string: "https://www.printables.com/@\(user.handle)") {
+                            Link(destination: profileURL) {
+                                Label("Profile", systemImage: "arrow.up.right.square")
+                                    .font(.caption)
+                            }
                         }
                     }
                 }
@@ -225,8 +233,10 @@ struct PrintablesDetailView: View {
 
             // Open in Browser
             Section {
-                Link(destination: URL(string: "https://www.printables.com/model/\(model.id)")!) {
-                    Label("View on Printables.com", systemImage: "safari")
+                if let browseURL = URL(string: "https://www.printables.com/model/\(model.id)") {
+                    Link(destination: browseURL) {
+                        Label("View on Printables.com", systemImage: "safari")
+                    }
                 }
             }
         }
@@ -250,7 +260,13 @@ struct PrintablesDetailView: View {
     }
 
     @ViewBuilder
-    private func fileRow(file: PrintablesFile, icon: String, modelName: String, printId: String, fileType: String) -> some View {
+    private func fileRow(
+        file: PrintablesFile,
+        icon: String,
+        modelName: String,
+        printId: String,
+        fileType: String
+    ) -> some View {
         HStack {
             Image(systemName: icon)
                 .foregroundStyle(.blue)

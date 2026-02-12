@@ -46,14 +46,14 @@ struct WidgetData: Codable {
     }
 
     /// Load from shared UserDefaults
-    static func load() -> WidgetData? {
+    static func load() -> Self? {
         guard let defaults = UserDefaults(suiteName: Self.appGroupID),
               let data = defaults.data(forKey: userDefaultsKey),
-              let state = try? JSONDecoder().decode(WidgetData.self, from: data)
+              let state = try? JSONDecoder().decode(Self.self, from: data)
         else { return nil }
         return state
     }
 
     /// Empty state for when no data is available
-    static let empty = WidgetData(printers: [], modelCount: 0, printJobCount: 0, successRate: 0)
+    static let empty = Self(printers: [], modelCount: 0, printJobCount: 0, successRate: 0)
 }

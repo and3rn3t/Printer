@@ -17,7 +17,7 @@ struct ModelDetailView: View {
 
     @AppStorage("showSlicingWarnings") private var showSlicingWarnings = true
     @AppStorage("confirmBeforeDelete") private var confirmBeforeDelete = true
-    
+
     @State private var showingPrintSheet = false
     @State private var selectedPrinter: Printer?
     @State private var isEditingName = false
@@ -26,7 +26,7 @@ struct ModelDetailView: View {
     @State private var newTag = ""
     @State private var show3DPreview = false
     @State private var showingCollectionPicker = false
-    
+
     /// All unique tags across the library for auto-suggest
     private var allUniqueTags: [String] {
         Array(Set(allModels.flatMap { $0.tags })).sorted()
@@ -37,7 +37,7 @@ struct ModelDetailView: View {
         let ext = model.fileURL.components(separatedBy: ".").last?.lowercased() ?? ""
         return ["stl", "obj", "usdz", "usda", "usdc"].contains(ext)
     }
-    
+
     var body: some View {
         ScrollView {
             VStack(spacing: 24) {
@@ -72,12 +72,12 @@ struct ModelDetailView: View {
                                     startPoint: .topLeading,
                                     endPoint: .bottomTrailing
                                 )
-                                
+
                                 VStack(spacing: 12) {
                                     Image(systemName: "cube.transparent")
                                         .font(.system(size: 80))
                                         .foregroundStyle(.white)
-                                    
+
                                     Text("No Preview")
                                         .font(.headline)
                                         .foregroundStyle(.white.opacity(0.8))
@@ -89,7 +89,7 @@ struct ModelDetailView: View {
                     .frame(maxHeight: 400)
                     .clipShape(RoundedRectangle(cornerRadius: 16))
                     .shadow(color: .black.opacity(0.15), radius: 10, y: 5)
-                    
+
                     // Source badge + 3D toggle
                     HStack(spacing: 8) {
                         if canShow3D {
@@ -136,7 +136,11 @@ struct ModelDetailView: View {
                             Text("Slicing Required")
                                 .font(.subheadline)
                                 .fontWeight(.semibold)
-                            Text("This \(model.fileType.displayName) file needs to be sliced before printing on a resin printer. Use a slicer like Anycubic Photon Workshop to generate a .pwmx file.")
+                            Text(
+                                "This \(model.fileType.displayName) file needs to be sliced "
+                                + "before printing on a resin printer. Use a slicer like "
+                                + "Anycubic Photon Workshop to generate a .pwmx file."
+                            )
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -147,7 +151,7 @@ struct ModelDetailView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                     .padding(.horizontal)
                 }
-                
+
                 // Model info card
                 VStack(spacing: 16) {
                     // Name editing
@@ -168,9 +172,9 @@ struct ModelDetailView: View {
                             Text(model.name)
                                 .font(.title2)
                                 .fontWeight(.bold)
-                            
+
                             Spacer()
-                            
+
                             Button {
                                 withAnimation(.easeInOut(duration: 0.2)) {
                                     isEditingName = true
@@ -184,9 +188,9 @@ struct ModelDetailView: View {
                         }
                         .transition(.move(edge: .top).combined(with: .opacity))
                     }
-                    
+
                     Divider()
-                    
+
                     // Metadata grid
                     VStack(spacing: 12) {
                         InfoRow(
@@ -206,19 +210,19 @@ struct ModelDetailView: View {
                             label: "Print Ready",
                             value: model.requiresSlicing ? "Needs Slicing" : "Ready"
                         )
-                        
+
                         InfoRow(
                             icon: "calendar",
                             label: "Created",
                             value: model.createdDate.formatted(date: .abbreviated, time: .shortened)
                         )
-                        
+
                         InfoRow(
                             icon: "clock.fill",
                             label: "Modified",
                             value: model.modifiedDate.formatted(date: .abbreviated, time: .shortened)
                         )
-                        
+
                         if !model.printJobs.isEmpty {
                             InfoRow(
                                 icon: "printer.fill",
@@ -259,7 +263,9 @@ struct ModelDetailView: View {
                                 // Build plate preview against first printer with plate dimensions
                                 if let printer = printers.first(where: {
                                     ($0.buildPlateX ?? 0) > 0 && ($0.buildPlateY ?? 0) > 0 && ($0.buildPlateZ ?? 0) > 0
-                                }), let bpX = printer.buildPlateX, let bpY = printer.buildPlateY, let bpZ = printer.buildPlateZ {
+                                }), let bpX = printer.buildPlateX,
+                                    let bpY = printer.buildPlateY,
+                                    let bpZ = printer.buildPlateZ {
                                     BuildPlateView(
                                         plateX: bpX,
                                         plateY: bpY,
@@ -450,9 +456,9 @@ struct ModelDetailView: View {
                             }
                         }
                     }
-                    
+
                     Divider()
-                    
+
                     // Notes section
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
@@ -461,7 +467,7 @@ struct ModelDetailView: View {
                             Text("Notes")
                                 .font(.headline)
                         }
-                        
+
                         TextEditor(text: $model.notes)
                             .frame(minHeight: 100)
                             .padding(8)
@@ -479,7 +485,7 @@ struct ModelDetailView: View {
                         .shadow(color: .black.opacity(0.05), radius: 8, y: 4)
                 }
                 .padding(.horizontal)
-                
+
                 // Print history
                 if !model.printJobs.isEmpty {
                     VStack(alignment: .leading, spacing: 16) {
@@ -490,7 +496,7 @@ struct ModelDetailView: View {
                                 .font(.headline)
                         }
                         .padding(.horizontal)
-                        
+
                         VStack(spacing: 12) {
                             ForEach(model.printJobs) { job in
                                 PrintJobRowView(job: job)
@@ -505,7 +511,7 @@ struct ModelDetailView: View {
                     }
                     .padding(.horizontal)
                 }
-                
+
                 // Action button
                 VStack(spacing: 12) {
                     Button {
@@ -525,7 +531,7 @@ struct ModelDetailView: View {
                         .shadow(color: printers.isEmpty ? .clear : .blue.opacity(0.3), radius: 8, y: 4)
                     }
                     .disabled(printers.isEmpty)
-                    
+
                     if printers.isEmpty {
                         HStack(spacing: 6) {
                             Image(systemName: "info.circle.fill")
@@ -655,7 +661,7 @@ struct ModelDetailView: View {
         }
         return "\(count)"
     }
-    
+
 }
 
 // MARK: - Info Row Component
@@ -664,7 +670,7 @@ struct InfoRow: View {
     let icon: String
     let label: String
     let value: String
-    
+
     var body: some View {
         HStack {
             Label {
@@ -674,9 +680,9 @@ struct InfoRow: View {
                 Image(systemName: icon)
                     .foregroundStyle(.blue)
             }
-            
+
             Spacer()
-            
+
             Text(value)
                 .fontWeight(.medium)
         }
@@ -687,7 +693,7 @@ struct InfoRow: View {
 
 struct PrintJobRowView: View {
     let job: PrintJob
-    
+
     var body: some View {
         HStack(spacing: 12) {
             // Status icon
@@ -695,17 +701,17 @@ struct PrintJobRowView: View {
                 Circle()
                     .fill(statusColor.opacity(0.2))
                     .frame(width: 44, height: 44)
-                
+
                 Image(systemName: statusIcon)
                     .font(.headline)
                     .foregroundStyle(statusColor)
             }
-            
+
             VStack(alignment: .leading, spacing: 4) {
                 Text(job.printerName)
                     .font(.subheadline)
                     .fontWeight(.medium)
-                
+
                 HStack(spacing: 6) {
                     Text(job.startDate.formatted(date: .abbreviated, time: .shortened))
                         .font(.caption)
@@ -725,9 +731,9 @@ struct PrintJobRowView: View {
                     }
                 }
             }
-            
+
             Spacer()
-            
+
             // Status badge
             Text(statusText)
                 .font(.caption)
@@ -744,7 +750,7 @@ struct PrintJobRowView: View {
                 .fill(Color.gray.opacity(0.15))
         }
     }
-    
+
     private var statusIcon: String { job.status.icon }
     private var statusColor: Color { job.status.color }
     private var statusText: String { job.status.displayText }

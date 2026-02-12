@@ -94,6 +94,15 @@ identifier_name:
     - i
     - to
     - at
+    - r
+    - g
+    - b
+    - h
+    - m
+    - s
+    - a
+    - v
+    - p
 
 function_parameter_count:
   warning: 6

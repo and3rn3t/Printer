@@ -214,7 +214,7 @@ struct EditPrinterView: View {
 
     // MARK: - Actions
 
-    private func testConnection() {
+    func testConnection() {
         isTestingConnection = true
         connectionTestResult = nil
 

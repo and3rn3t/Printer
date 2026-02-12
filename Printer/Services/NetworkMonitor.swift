@@ -15,18 +15,18 @@ import Observation
 /// whether the device is connected to a local network (WiFi/Ethernet).
 @Observable
 final class NetworkMonitor {
-    
+
     // MARK: - Properties
-    
+
     /// Whether the device has any network connection
     private(set) var isConnected: Bool = false
-    
+
     /// Whether the device is on a local network (WiFi or wired)
     private(set) var isOnLocalNetwork: Bool = false
-    
+
     /// Current network interface type
     private(set) var interfaceType: InterfaceType = .unknown
-    
+
     /// Human-readable network status description
     var statusDescription: String {
         if !isConnected {
@@ -43,37 +43,37 @@ final class NetworkMonitor {
             return "Connected"
         }
     }
-    
+
     /// Whether the current network supports local printer access
     var canAccessLocalPrinters: Bool {
         isConnected && isOnLocalNetwork
     }
-    
+
     enum InterfaceType {
         case wifi
         case wiredEthernet
         case cellular
         case unknown
     }
-    
+
     // MARK: - Private
-    
+
     private let monitor: NWPathMonitor
     private let monitorQueue = DispatchQueue(label: "com.printer.networkMonitor", qos: .utility)
-    
+
     // MARK: - Initialization
-    
+
     init() {
         monitor = NWPathMonitor()
         startMonitoring()
     }
-    
+
     deinit {
         monitor.cancel()
     }
-    
+
     // MARK: - Monitoring
-    
+
     private func startMonitoring() {
         monitor.pathUpdateHandler = { [weak self] path in
             Task { @MainActor in
@@ -82,11 +82,11 @@ final class NetworkMonitor {
         }
         monitor.start(queue: monitorQueue)
     }
-    
+
     @MainActor
     private func updateStatus(with path: NWPath) {
         isConnected = path.status == .satisfied
-        
+
         // Determine interface type
         if path.usesInterfaceType(.wifi) {
             interfaceType = .wifi

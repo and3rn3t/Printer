@@ -146,7 +146,8 @@ actor SlicedFileParser {
 
         // Validate magic: first 12 bytes should start with "ANYCUBIC"
         let markBytes = fileMarkData.prefix(PWMXConstants.markSize)
-        let markString = String(data: markBytes.prefix(8), encoding: .utf8)?.trimmingCharacters(in: .controlCharacters) ?? ""
+        let markString = String(data: markBytes.prefix(8), encoding: .utf8)?
+            .trimmingCharacters(in: .controlCharacters) ?? ""
         guard markString == PWMXConstants.fileMarkString else {
             throw SlicedFileParserError.invalidMagic(PWMXConstants.fileMarkString)
         }
@@ -378,7 +379,10 @@ actor SlicedFileParser {
 
             // Layer count
             if layerCount == 0 {
-                if let value = extractUInt(from: comment, keys: ["LAYER_COUNT", "total layers", "total_layers", "Layer count"]) {
+                if let value = extractUInt(
+                    from: comment,
+                    keys: ["LAYER_COUNT", "total layers", "total_layers", "Layer count"]
+                ) {
                     layerCount = value
                 }
             }
@@ -389,7 +393,10 @@ actor SlicedFileParser {
                     if let value = UInt32(comment.dropFirst(5).trimmingCharacters(in: .whitespaces)) {
                         printTime = value
                     }
-                } else if let value = extractUInt(from: comment, keys: ["PRINT.TIME", "estimated_print_time", "print_time"]) {
+                } else if let value = extractUInt(
+                    from: comment,
+                    keys: ["PRINT.TIME", "estimated_print_time", "print_time"]
+                ) {
                     printTime = value
                 }
             }
@@ -397,7 +404,10 @@ actor SlicedFileParser {
             // Filament used (convert meters to mm)
             if filamentUsedMm == 0 {
                 if lower.contains("filament used") || lower.contains("filament_used") {
-                    if let value = extractFloat(from: comment, keys: ["filament used", "filament_used_mm", "Filament used"]) {
+                    if let value = extractFloat(
+                        from: comment,
+                        keys: ["filament used", "filament_used_mm", "Filament used"]
+                    ) {
                         // Heuristic: if value < 100, it's likely in meters; convert to mm
                         filamentUsedMm = value < 100 ? value * 1000 : value
                     }
@@ -434,7 +444,7 @@ actor SlicedFileParser {
                     .replacingOccurrences(of: ":", with: "")
                     .trimmingCharacters(in: .whitespaces)
                 // Take first word (stop at space, "m", etc.)
-                let numStr = after.prefix(while: { $0.isNumber || $0 == "." || $0 == "-" })
+                let numStr = after.prefix { $0.isNumber || $0 == "." || $0 == "-" }
                 if let value = Float(numStr) {
                     return value
                 }
@@ -452,7 +462,7 @@ actor SlicedFileParser {
                     .replacingOccurrences(of: "=", with: "")
                     .replacingOccurrences(of: ":", with: "")
                     .trimmingCharacters(in: .whitespaces)
-                let numStr = after.prefix(while: { $0.isNumber })
+                let numStr = after.prefix { $0.isNumber }
                 if let value = UInt32(numStr) {
                     return value
                 }
@@ -480,7 +490,9 @@ actor SlicedFileParser {
                 return nil
             }
         } catch {
-            AppLogger.fileOps.error("SlicedFileParser: Failed to extract thumbnail from \(ext): \(error.localizedDescription)")
+            AppLogger.fileOps.error(
+                "SlicedFileParser: Failed to extract thumbnail from \(ext): \(error.localizedDescription)"
+            )
             return nil
         }
     }
@@ -527,8 +539,8 @@ actor SlicedFileParser {
         let previewMark = String(data: previewHeader.prefix(7), encoding: .utf8) ?? ""
         guard previewMark == "PREVIEW" else { return nil }
 
-        let resolutionX = previewHeader.readUInt32(at: PWMXConstants.tableBaseLength)      // offset 16
-        let resolutionY = previewHeader.readUInt32(at: PWMXConstants.tableBaseLength + 8)   // offset 24 (after 4-byte "x" mark)
+        let resolutionX = previewHeader.readUInt32(at: PWMXConstants.tableBaseLength)
+        let resolutionY = previewHeader.readUInt32(at: PWMXConstants.tableBaseLength + 8)
 
         guard resolutionX > 0, resolutionY > 0,
               resolutionX <= 1024, resolutionY <= 1024 else { return nil }
@@ -716,7 +728,7 @@ actor SlicedFileParser {
 
 // MARK: - Data Extension for Binary Reading
 
-private nonisolated extension Data {
+nonisolated private extension Data {
     /// Read a little-endian UInt32 at the given byte offset
     func readUInt32(at offset: Int) -> UInt32 {
         guard offset + 4 <= count else { return 0 }

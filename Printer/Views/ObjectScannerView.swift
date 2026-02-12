@@ -16,9 +16,9 @@ import Combine
 struct ObjectScannerView: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var scanManager = ObjectScanManager()
-    
+
     let onComplete: (URL) -> Void
-    
+
     var body: some View {
         NavigationStack {
             VStack(spacing: 20) {
@@ -27,27 +27,27 @@ struct ObjectScannerView: View {
                         Image(systemName: "camera.metering.center.weighted")
                             .font(.system(size: 80))
                             .foregroundStyle(.blue)
-                        
+
                         Text("3D Scanning")
                             .font(.title)
                             .fontWeight(.bold)
-                        
+
                         Text("For full 3D object scanning with LiDAR, use a dedicated scanning app like:")
                             .multilineTextAlignment(.center)
                             .foregroundStyle(.secondary)
                             .padding(.horizontal)
-                        
+
                         VStack(alignment: .leading, spacing: 12) {
                             ScanningAppRow(
                                 name: "Polycam",
                                 description: "Free LiDAR scanning"
                             )
-                            
+
                             ScanningAppRow(
                                 name: "3D Scanner App",
                                 description: "Easy to use scanning"
                             )
-                            
+
                             ScanningAppRow(
                                 name: "Scaniverse",
                                 description: "High-quality captures"
@@ -56,13 +56,13 @@ struct ObjectScannerView: View {
                         .padding()
                         .background(.quaternary.opacity(0.5))
                         .cornerRadius(12)
-                        
+
                         Text("Then export your scan as STL or OBJ and import it into this app.")
                             .font(.footnote)
                             .multilineTextAlignment(.center)
                             .foregroundStyle(.secondary)
                             .padding(.horizontal)
-                        
+
                         Spacer()
                     }
                     .padding()
@@ -70,10 +70,10 @@ struct ObjectScannerView: View {
                     Image(systemName: "exclamationmark.triangle")
                         .font(.system(size: 60))
                         .foregroundStyle(.orange)
-                    
+
                     Text("LiDAR Not Available")
                         .font(.title2)
-                    
+
                     Text("This device does not have a LiDAR sensor. You can still import 3D models from other sources.")
                         .multilineTextAlignment(.center)
                         .foregroundStyle(.secondary)
@@ -96,22 +96,22 @@ struct ObjectScannerView: View {
 struct ScanningAppRow: View {
     let name: String
     let description: String
-    
+
     var body: some View {
         HStack {
             Image(systemName: "app.badge")
                 .foregroundStyle(.blue)
                 .font(.title3)
-            
+
             VStack(alignment: .leading, spacing: 2) {
                 Text(name)
                     .font(.headline)
-                
+
                 Text(description)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            
+
             Spacer()
         }
     }
@@ -121,7 +121,7 @@ struct ScanningAppRow: View {
 @MainActor
 class ObjectScanManager: ObservableObject {
     @Published var error: Error?
-    
+
     var isLiDARAvailable: Bool {
         // Check if device has LiDAR by checking for AVCaptureDevice with depth capability
         if #available(iOS 15.4, *) {
@@ -130,7 +130,7 @@ class ObjectScanManager: ObservableObject {
                 mediaType: .video,
                 position: .back
             ).devices
-            
+
             return !devices.isEmpty
         }
         return false
@@ -142,20 +142,20 @@ class ObjectScanManager: ObservableObject {
 struct ObjectScannerView: View {
     let onComplete: (URL) -> Void
     @Environment(\.dismiss) private var dismiss
-    
+
     var body: some View {
         VStack(spacing: 20) {
             Image(systemName: "exclamationmark.triangle")
                 .font(.system(size: 60))
                 .foregroundStyle(.orange)
-            
+
             Text("Not Available")
                 .font(.title2)
-            
+
             Text("3D object scanning is only available on iOS devices with LiDAR.")
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
-            
+
             Button("Dismiss") {
                 dismiss()
             }

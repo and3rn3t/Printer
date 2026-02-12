@@ -23,7 +23,7 @@ nonisolated struct PrinterStatus: Codable, Sendable {
 
     enum CodingKeys: String, CodingKey {
         case state
-        case temperature = "temperature"
+        case temperature
         case printerName
     }
 }

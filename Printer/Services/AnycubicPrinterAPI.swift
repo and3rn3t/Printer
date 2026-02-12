@@ -376,14 +376,14 @@ actor AnycubicPrinterAPI {
 
         // Build multipart body
         var body = Data()
-        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append(Data("--\(boundary)\r\n".utf8))
         body.append(
-            "Content-Disposition: form-data; name=\"file\"; filename=\"\(filename)\"\r\n"
-                .data(using: .utf8)!
+            Data("Content-Disposition: form-data; name=\"file\"; filename=\"\(filename)\"\r\n"
+                .utf8)
         )
-        body.append("Content-Type: application/octet-stream\r\n\r\n".data(using: .utf8)!)
+        body.append(Data("Content-Type: application/octet-stream\r\n\r\n".utf8))
         body.append(fileData)
-        body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
+        body.append(Data("\r\n--\(boundary)--\r\n".utf8))
 
         // Create a delegate for progress tracking
         let taskID = UUID()
@@ -692,7 +692,9 @@ actor AnycubicPrinterAPI {
             let (_, response) = try await urlSession.data(for: request)
             return (response as? HTTPURLResponse)?.statusCode == 200
         } catch {
-            AppLogger.network.debug("OctoPrint reachability check failed for \(ipAddress): \(error.localizedDescription)")
+            AppLogger.network.debug(
+                "OctoPrint reachability check failed for \(ipAddress): \(error.localizedDescription)"
+            )
             // Also try Anycubic native endpoint
             guard let anycubicURL = URL(string: "http://\(ipAddress):18910/info") else {
                 return false
@@ -705,7 +707,9 @@ actor AnycubicPrinterAPI {
                 let (_, response) = try await urlSession.data(for: nativeRequest)
                 return (response as? HTTPURLResponse)?.statusCode == 200
             } catch {
-                AppLogger.network.debug("Anycubic HTTP reachability check also failed for \(ipAddress): \(error.localizedDescription)")
+                AppLogger.network.debug(
+                    "Anycubic HTTP reachability check also failed for \(ipAddress): \(error.localizedDescription)"
+                )
                 return false
             }
         }

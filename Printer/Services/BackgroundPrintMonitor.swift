@@ -84,7 +84,9 @@ actor BackgroundPrintMonitor {
     /// Poll all known printers and check for active prints. Returns true if any printer is actively printing.
     func pollAllPrinters() async -> Bool {
         guard let container = try? ModelContainer(
-            for: Printer.self, PrintJob.self, PrintModel.self,
+            for: Printer.self,
+            PrintJob.self,
+            PrintModel.self,
             configurations: ModelConfiguration(isStoredInMemoryOnly: false)
         ) else {
             AppLogger.background.error("Failed to create ModelContainer for background polling")
@@ -140,10 +142,16 @@ actor BackgroundPrintMonitor {
             do {
                 let status = try await service.getStatus(ipAddress: printer.ipAddress, port: printer.port)
                 let isPrinting = status == .printing || status == .paused
-                return PrinterPollResult(isPrinting: isPrinting, progress: nil, fileName: nil, estimatedTimeRemaining: nil)
+                return PrinterPollResult(
+                    isPrinting: isPrinting, progress: nil, fileName: nil, estimatedTimeRemaining: nil
+                )
             } catch {
-                AppLogger.background.debug("Background ACT poll failed for \(printer.name): \(error.localizedDescription)")
-                return PrinterPollResult(isPrinting: false, progress: nil, fileName: nil, estimatedTimeRemaining: nil)
+                AppLogger.background.debug(
+                    "Background ACT poll failed for \(printer.name): \(error.localizedDescription)"
+                )
+                return PrinterPollResult(
+                    isPrinting: false, progress: nil, fileName: nil, estimatedTimeRemaining: nil
+                )
             }
 
         case .octoprint:
@@ -154,10 +162,19 @@ actor BackgroundPrintMonitor {
                 let progress = job.progress?.completion.map { $0 / 100.0 }
                 let timeLeft = job.progress?.printTimeLeft
                 let fileName = job.job?.file?.name
-                return PrinterPollResult(isPrinting: isPrinting, progress: progress, fileName: fileName, estimatedTimeRemaining: timeLeft)
+                return PrinterPollResult(
+                    isPrinting: isPrinting,
+                    progress: progress,
+                    fileName: fileName,
+                    estimatedTimeRemaining: timeLeft
+                )
             } catch {
-                AppLogger.background.debug("Background HTTP poll failed for \(printer.name): \(error.localizedDescription)")
-                return PrinterPollResult(isPrinting: false, progress: nil, fileName: nil, estimatedTimeRemaining: nil)
+                AppLogger.background.debug(
+                    "Background HTTP poll failed for \(printer.name): \(error.localizedDescription)"
+                )
+                return PrinterPollResult(
+                    isPrinting: false, progress: nil, fileName: nil, estimatedTimeRemaining: nil
+                )
             }
 
         case .anycubicHTTP:
@@ -200,7 +217,7 @@ actor BackgroundPrintMonitor {
 
 // MARK: - Poll Result
 
-private nonisolated struct PrinterPollResult {
+nonisolated private struct PrinterPollResult {
     let isPrinting: Bool
     let progress: Double?
     let fileName: String?

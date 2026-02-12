@@ -20,7 +20,9 @@ struct ResinProfileListView: View {
                 ContentUnavailableView(
                     "No Material Profiles",
                     systemImage: "drop.fill",
-                    description: Text("Add resin or filament profiles to track costs and exposure settings per material.")
+                    description: Text(
+                        "Add resin or filament profiles to track costs and exposure settings per material."
+                    )
                 )
             } else {
                 ForEach(profiles) { profile in
@@ -77,7 +79,8 @@ struct ResinProfileListView: View {
             Spacer()
 
             if profile.costPerMl > 0 {
-                Text(profile.costPerMl, format: .currency(code: UserDefaults.standard.string(forKey: "resinCurrency") ?? "USD"))
+                let currencyCode = UserDefaults.standard.string(forKey: "resinCurrency") ?? "USD"
+                Text(profile.costPerMl, format: .currency(code: currencyCode))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Text("/ mL")
@@ -126,7 +129,8 @@ struct ResinProfileDetailView: View {
                 }
                 if profile.costPerMl > 0 {
                     LabeledContent("Cost / mL") {
-                        Text(profile.costPerMl, format: .currency(code: UserDefaults.standard.string(forKey: "resinCurrency") ?? "USD"))
+                        let currencyCode = UserDefaults.standard.string(forKey: "resinCurrency") ?? "USD"
+                        Text(profile.costPerMl, format: .currency(code: currencyCode))
                     }
                 }
             }

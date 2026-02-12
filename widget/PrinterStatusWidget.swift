@@ -24,7 +24,7 @@ struct PrinterStatusProvider: TimelineProvider {
         let data = WidgetData.load() ?? .empty
         let entry = PrinterStatusEntry(date: Date(), data: data)
         // Refresh every 10 minutes
-        let nextUpdate = Calendar.current.date(byAdding: .minute, value: 10, to: Date())!
+        let nextUpdate = Calendar.current.date(byAdding: .minute, value: 10, to: Date()) ?? Date()
         let timeline = Timeline(entries: [entry], policy: .after(nextUpdate))
         completion(timeline)
     }
@@ -208,7 +208,9 @@ struct PrinterAccessoryProvider: TimelineProvider {
     func getTimeline(in context: Context, completion: @escaping (Timeline<PrinterStatusEntry>) -> Void) {
         let data = WidgetData.load() ?? .empty
         let entry = PrinterStatusEntry(date: Date(), data: data)
-        let nextUpdate = Calendar.current.date(byAdding: .minute, value: 10, to: Date())!
+        let nextUpdate = Calendar.current.date(
+            byAdding: .minute, value: 10, to: Date()
+        ) ?? Date()
         completion(Timeline(entries: [entry], policy: .after(nextUpdate)))
     }
 }

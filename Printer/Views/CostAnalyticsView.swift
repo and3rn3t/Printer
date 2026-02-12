@@ -54,7 +54,7 @@ struct CostAnalyticsView: View {
     private func costForJob(_ job: PrintJob) -> Double {
         guard let volume = job.model?.slicedVolumeMl, volume > 0 else { return 0 }
         // Use printer-specific cost if set, otherwise global
-        let printerCost = printers.first(where: { $0.ipAddress == job.printerIP })?.resinCostPerMl
+        let printerCost = printers.first { $0.ipAddress == job.printerIP }?.resinCostPerMl
         let costPerMl = printerCost ?? resinCostPerMl
         guard costPerMl > 0 else { return 0 }
         return Double(volume) * costPerMl
@@ -81,7 +81,9 @@ struct CostAnalyticsView: View {
     /// Current month's spend for budget tracking
     private var currentMonthSpend: Double {
         let cal = Calendar.current
-        let start = cal.date(from: cal.dateComponents([.year, .month], from: Date()))!
+        let start = cal.date(
+            from: cal.dateComponents([.year, .month], from: Date())
+        ) ?? Date()
         return completedJobs
             .filter { $0.startDate >= start }
             .reduce(0) { $0 + costForJob($1) }

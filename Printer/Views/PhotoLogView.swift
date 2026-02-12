@@ -235,7 +235,7 @@ struct PhotoLogBadge: View {
     let count: Int
 
     var body: some View {
-        if count > 0 {
+        if !isEmpty {
             HStack(spacing: 3) {
                 Image(systemName: "camera.fill")
                     .font(.caption2)

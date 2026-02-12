@@ -253,7 +253,11 @@ struct AddInventoryItemView: View {
                     HStack {
                         Text("Cost")
                         Spacer()
-                        TextField("0.00", value: $purchaseCost, format: .currency(code: UserDefaults.standard.string(forKey: "resinCurrency") ?? "USD"))
+                        TextField(
+                            "0.00",
+                            value: $purchaseCost,
+                            format: .currency(code: UserDefaults.standard.string(forKey: "resinCurrency") ?? "USD")
+                        )
                             .multilineTextAlignment(.trailing)
                             .frame(width: 100)
                             #if os(iOS)
@@ -348,7 +352,8 @@ struct InventoryItemDetailView: View {
                         }
 
                         VStack {
-                            Text(String(format: "%.0f %@", item.initialVolume, item.resinProfile?.materialType.isResin == true ? "mL" : "g"))
+                            let unit = item.resinProfile?.materialType.isResin == true ? "mL" : "g"
+                            Text(String(format: "%.0f %@", item.initialVolume, unit))
                                 .font(.headline)
                             Text("Initial")
                                 .font(.caption2)
@@ -356,7 +361,8 @@ struct InventoryItemDetailView: View {
                         }
 
                         VStack {
-                            Text(String(format: "%.0f %@", item.initialVolume - item.remainingVolume, item.resinProfile?.materialType.isResin == true ? "mL" : "g"))
+                            let usedUnit = item.resinProfile?.materialType.isResin == true ? "mL" : "g"
+                            Text(String(format: "%.0f %@", item.initialVolume - item.remainingVolume, usedUnit))
                                 .font(.headline)
                             Text("Used")
                                 .font(.caption2)
@@ -388,8 +394,9 @@ struct InventoryItemDetailView: View {
                 }
 
                 if let cost = item.purchaseCost, cost > 0 {
+                    let currencyCode = UserDefaults.standard.string(forKey: "resinCurrency") ?? "USD"
                     LabeledContent("Cost") {
-                        Text(cost, format: .currency(code: UserDefaults.standard.string(forKey: "resinCurrency") ?? "USD"))
+                        Text(cost, format: .currency(code: currencyCode))
                     }
                 }
 
@@ -401,7 +408,8 @@ struct InventoryItemDetailView: View {
                 }
 
                 LabeledContent("Low Stock Alert") {
-                    Text(String(format: "%.0f %@", item.lowStockThreshold, item.resinProfile?.materialType.isResin == true ? "mL" : "g"))
+                    let unit = item.resinProfile?.materialType.isResin == true ? "mL" : "g"
+                    Text(String(format: "%.0f %@", item.lowStockThreshold, unit))
                 }
             }
 
