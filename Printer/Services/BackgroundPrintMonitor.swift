@@ -123,7 +123,7 @@ actor BackgroundPrintMonitor {
     private func checkPrinterStatus(_ printer: Printer) async -> PrinterPollResult {
         switch printer.printerProtocol {
         case .act:
-            let service = PhotonPrinterService()
+            let service = PhotonPrinterService.shared
             do {
                 let status = try await service.getStatus(ipAddress: printer.ipAddress, port: printer.port)
                 let isPrinting = status == .printing || status == .paused
@@ -133,7 +133,7 @@ actor BackgroundPrintMonitor {
             }
 
         case .octoprint:
-            let api = AnycubicPrinterAPI()
+            let api = AnycubicPrinterAPI.shared
             do {
                 let job = try await api.getJobStatus(ipAddress: printer.ipAddress, apiKey: printer.apiKey)
                 let isPrinting = job.state.lowercased().contains("printing")

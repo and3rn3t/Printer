@@ -85,7 +85,7 @@ final class PrintNotificationManager: @unchecked Sendable {
             content.title = "Print Complete \u{2705}"
             content.body = "\(displayName) on \(printerName) finished successfully"
             if duration > 0 {
-                content.body += " in \(Self.formatDuration(duration))"
+                content.body += " in \(Self.formatDurationLocal(duration))"
             }
             content.categoryIdentifier = Category.printComplete
             content.sound = .default
@@ -134,7 +134,7 @@ final class PrintNotificationManager: @unchecked Sendable {
         content.title = "\(displayName) — \(milestone)% Complete"
 
         if let remaining = estimatedTimeRemaining, remaining > 0 {
-            content.body = "\(printerName) · ~\(Self.formatDuration(remaining)) remaining"
+            content.body = "\(printerName) · ~\(Self.formatDurationLocal(remaining)) remaining"
         } else {
             content.body = "Printing on \(printerName)"
         }
@@ -163,7 +163,7 @@ final class PrintNotificationManager: @unchecked Sendable {
         let displayName = fileName ?? "Print"
 
         content.title = "\(displayName) — Finishing Soon"
-        content.body = "\(printerName) · ~\(Self.formatDuration(estimatedTimeRemaining)) remaining"
+        content.body = "\(printerName) · ~\(Self.formatDurationLocal(estimatedTimeRemaining)) remaining"
         content.sound = .default
         content.threadIdentifier = "print-progress"
 
@@ -215,16 +215,7 @@ final class PrintNotificationManager: @unchecked Sendable {
 
     // MARK: - Helpers
 
-    private static func formatDuration(_ seconds: TimeInterval) -> String {
-        let totalSeconds = Int(seconds)
-        let hours = totalSeconds / 3600
-        let minutes = (totalSeconds % 3600) / 60
-
-        if hours > 0 {
-            return "\(hours)h \(minutes)m"
-        } else if minutes > 0 {
-            return "\(minutes)m"
-        }
-        return "\(totalSeconds)s"
+    private static func formatDurationLocal(_ seconds: TimeInterval) -> String {
+        formatDuration(Double(seconds))
     }
 }

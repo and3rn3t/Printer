@@ -487,16 +487,7 @@ struct StatisticsView: View {
 
     private var formattedTotalCost: String {
         let currency = UserDefaults.standard.string(forKey: "resinCurrency") ?? "USD"
-        let symbol: String
-        switch currency {
-        case "EUR": symbol = "\u{20AC}"
-        case "GBP": symbol = "\u{00A3}"
-        case "JPY": symbol = "\u{00A5}"
-        case "CAD": symbol = "CA$"
-        case "AUD": symbol = "A$"
-        default: symbol = "$"
-        }
-        return "\(symbol)\(String(format: "%.2f", totalEstimatedCost))"
+        return formatCost(totalEstimatedCost, currency: currency)
     }
 }
 

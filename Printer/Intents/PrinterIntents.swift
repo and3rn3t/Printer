@@ -33,7 +33,7 @@ struct CheckPrinterStatusIntent: AppIntent {
 
         switch target.printerProtocol {
         case .act:
-            let service = PhotonPrinterService()
+            let service = PhotonPrinterService.shared
             do {
                 let photonStatus = try await service.getStatus(ipAddress: target.ipAddress, port: target.port)
                 let status = photonStatus.displayText
@@ -43,7 +43,7 @@ struct CheckPrinterStatusIntent: AppIntent {
             }
 
         case .octoprint:
-            let api = AnycubicPrinterAPI()
+            let api = AnycubicPrinterAPI.shared
             let reachable = await api.isReachable(ipAddress: target.ipAddress)
             if reachable {
                 if let job = try? await api.getJobStatus(ipAddress: target.ipAddress, apiKey: target.apiKey) {
@@ -86,7 +86,7 @@ struct GetPrintProgressIntent: AppIntent {
 
         switch target.printerProtocol {
         case .act:
-            let service = PhotonPrinterService()
+            let service = PhotonPrinterService.shared
             do {
                 let photonStatus = try await service.getStatus(ipAddress: target.ipAddress, port: target.port)
                 let display = photonStatus.displayText
@@ -96,7 +96,7 @@ struct GetPrintProgressIntent: AppIntent {
             }
 
         case .octoprint:
-            let api = AnycubicPrinterAPI()
+            let api = AnycubicPrinterAPI.shared
             if let job = try? await api.getJobStatus(ipAddress: target.ipAddress, apiKey: target.apiKey) {
                 let pct = job.progress?.completion.map { "\(Int($0))%" } ?? "unknown"
                 let fileName = job.job?.file?.name ?? "Unknown file"

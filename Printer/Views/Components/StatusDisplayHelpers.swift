@@ -86,6 +86,33 @@ func formatDuration(_ seconds: Double) -> String {
     return "\(secs)s"
 }
 
+// MARK: - Currency Formatting
+
+/// Returns the display symbol for a currency code (e.g. "USD" → "$", "EUR" → "€")
+func currencySymbol(for code: String) -> String {
+    switch code {
+    case "EUR": return "\u{20AC}"
+    case "GBP": return "\u{00A3}"
+    case "JPY": return "\u{00A5}"
+    case "CAD": return "CA$"
+    case "AUD": return "A$"
+    default: return "$"
+    }
+}
+
+/// Format a cost value with the appropriate currency symbol
+func formatCost(_ value: Double, currency: String) -> String {
+    "\(currencySymbol(for: currency))\(String(format: "%.2f", value))"
+}
+
+/// Format a cost value in short form (e.g. "$1k" for $1000)
+func formatCostShort(_ value: Double, currency: String) -> String {
+    if value >= 1000 {
+        return "\(currencySymbol(for: currency))\(String(format: "%.0fk", value / 1000))"
+    }
+    return "\(currencySymbol(for: currency))\(String(format: "%.0f", value))"
+}
+
 // MARK: - IP Address Validation
 
 /// Validate an IPv4 address string

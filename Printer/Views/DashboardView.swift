@@ -440,14 +440,7 @@ struct DashboardView: View {
     }
 
     private var costCurrencySymbol: String {
-        switch resinCurrency {
-        case "EUR": return "\u{20AC}"
-        case "GBP": return "\u{00A3}"
-        case "JPY": return "\u{00A5}"
-        case "CAD": return "CA$"
-        case "AUD": return "A$"
-        default: return "$"
-        }
+        currencySymbol(for: resinCurrency)
     }
 
     @ViewBuilder
@@ -501,7 +494,7 @@ struct DashboardView: View {
         for printer in printers {
             Task {
                 if printer.printerProtocol == .act {
-                    let service = PhotonPrinterService()
+                    let service = PhotonPrinterService.shared
                     if let status = try? await service.getStatus(
                         ipAddress: printer.ipAddress,
                         port: printer.port
@@ -521,7 +514,7 @@ struct DashboardView: View {
                         }
                     }
                 } else {
-                    let api = AnycubicPrinterAPI()
+                    let api = AnycubicPrinterAPI.shared
                     let reachable = await api.isReachable(ipAddress: printer.ipAddress)
                     await MainActor.run {
                         var state = printerStates[printer.id] ?? PrinterLiveState()

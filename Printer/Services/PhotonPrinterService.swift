@@ -20,6 +20,9 @@ import Network
 /// Discovery: UDP broadcast on port 3000 (some models) or TCP probe on port 6000.
 actor PhotonPrinterService {
 
+    /// Shared singleton instance — avoids creating redundant NWConnection instances
+    static let shared = PhotonPrinterService()
+
     // MARK: - Types
 
     /// Errors specific to Photon printer communication

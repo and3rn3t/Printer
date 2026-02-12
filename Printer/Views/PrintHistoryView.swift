@@ -611,15 +611,6 @@ struct PrintHistoryRowView: View {
     }
 
     private func formatCostString(_ cost: Double, currency: String) -> String {
-        let symbol: String
-        switch currency {
-        case "EUR": symbol = "\u{20AC}"
-        case "GBP": symbol = "\u{00A3}"
-        case "JPY": symbol = "\u{00A5}"
-        case "CAD": symbol = "CA$"
-        case "AUD": symbol = "A$"
-        default: symbol = "$"
-        }
-        return "\(symbol)\(String(format: "%.2f", cost))"
+        formatCost(cost, currency: currency)
     }
 }

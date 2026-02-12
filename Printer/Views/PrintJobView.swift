@@ -5,18 +5,18 @@
 //  Created by Matt on 2/10/26.
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct PrintJobView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
-    
+
     let model: PrintModel
     let printers: [Printer]
-    
+
     @AppStorage("defaultPrinterID") private var defaultPrinterID: String = ""
-    
+
     @State private var selectedPrinter: Printer?
     @State private var uploadProgress: Double = 0
     @State private var isUploading = false
@@ -27,7 +27,7 @@ struct PrintJobView: View {
     @State private var actFilename: String = ""
     @Query(sort: \ResinProfile.name) private var resinProfiles: [ResinProfile]
     @State private var selectedResinProfile: ResinProfile?
-    
+
     enum UploadPhase: Equatable {
         case idle
         case preparing
@@ -36,12 +36,12 @@ struct PrintJobView: View {
         case complete
         case failed(String)
     }
-    
+
     /// Whether the selected printer uses ACT protocol (resin printers with no HTTP upload)
     private var isACTPrinter: Bool {
         selectedPrinter?.printerProtocol == .act
     }
-    
+
     var body: some View {
         NavigationStack {
             Form {
@@ -56,11 +56,13 @@ struct PrintJobView: View {
                         Picker("Printer", selection: $selectedPrinter) {
                             Text("Select a printer")
                                 .tag(nil as Printer?)
-                            
+
                             ForEach(printers) { printer in
                                 HStack {
-                                    Image(systemName: printer.isConnected ? "circle.fill" : "circle")
-                                        .foregroundStyle(printer.isConnected ? .green : .gray)
+                                    Image(
+                                        systemName: printer.isConnected ? "circle.fill" : "circle"
+                                    )
+                                    .foregroundStyle(printer.isConnected ? .green : .gray)
                                     Text(printer.name)
                                 }
                                 .tag(printer as Printer?)
@@ -68,11 +70,14 @@ struct PrintJobView: View {
                         }
                     }
                 }
-                
+
                 Section("Model") {
                     LabeledContent("Name", value: model.name)
-                    LabeledContent("Size", value: ByteCountFormatter.string(fromByteCount: model.fileSize, countStyle: .file))
-                    
+                    LabeledContent(
+                        "Size",
+                        value: ByteCountFormatter.string(
+                            fromByteCount: model.fileSize, countStyle: .file))
+
                     if let printer = selectedPrinter {
                         LabeledContent("Protocol") {
                             Text(printer.printerProtocol == .act ? "ACT (TCP)" : "OctoPrint (HTTP)")
@@ -98,12 +103,18 @@ struct PrintJobView: View {
                         }
 
                         if let profile = selectedResinProfile, profile.costPerMl > 0,
-                           let volume = model.slicedVolumeMl, volume > 0 {
+                            let volume = model.slicedVolumeMl, volume > 0
+                        {
                             let cost = Double(volume) * profile.costPerMl
                             LabeledContent("Material Cost") {
-                                Text(cost, format: .currency(code: UserDefaults.standard.string(forKey: "resinCurrency") ?? "USD"))
-                                    .fontWeight(.semibold)
-                                    .foregroundStyle(.blue)
+                                Text(
+                                    cost,
+                                    format: .currency(
+                                        code: UserDefaults.standard.string(forKey: "resinCurrency")
+                                            ?? "USD")
+                                )
+                                .fontWeight(.semibold)
+                                .foregroundStyle(.blue)
                             }
                         }
                     }
@@ -133,9 +144,10 @@ struct PrintJobView: View {
                             let costPerMl = UserDefaults.standard.double(forKey: "resinCostPerMl")
                             if costPerMl > 0 {
                                 let cost = Double(volume) * costPerMl
-                                let currency = UserDefaults.standard.string(forKey: "resinCurrency") ?? "USD"
+                                let currency =
+                                    UserDefaults.standard.string(forKey: "resinCurrency") ?? "USD"
                                 LabeledContent("Estimated Cost") {
-                                    Text(Self.formatCost(cost, currency: currency))
+                                    Text(Self.formatCostLocal(cost, currency: currency))
                                         .fontWeight(.semibold)
                                         .foregroundStyle(.blue)
                                 }
@@ -161,8 +173,10 @@ struct PrintJobView: View {
                 } else if !model.fileType.isSliced {
                     Section {
                         Label {
-                            Text("No print estimate available — this file has not been sliced. Slice it in your slicer software to see time, layer, and cost estimates.")
-                                .font(.caption)
+                            Text(
+                                "No print estimate available — this file has not been sliced. Slice it in your slicer software to see time, layer, and cost estimates."
+                            )
+                            .font(.caption)
                         } icon: {
                             Image(systemName: "info.circle")
                         }
@@ -171,7 +185,9 @@ struct PrintJobView: View {
                 }
 
                 // Model dimensions
-                if model.hasDimensions, let x = model.dimensionX, let y = model.dimensionY, let z = model.dimensionZ {
+                if model.hasDimensions, let x = model.dimensionX, let y = model.dimensionY,
+                    let z = model.dimensionZ
+                {
                     Section("Model Dimensions") {
                         LabeledContent("Size") {
                             Text(String(format: "%.1f × %.1f × %.1f mm", x, y, z))
@@ -198,23 +214,28 @@ struct PrintJobView: View {
                         }
                     }
                 }
-                
+
                 // ACT printer: file must already be on USB
                 if isACTPrinter {
                     Section {
                         VStack(alignment: .leading, spacing: 8) {
-                            Label("Resin Printer (ACT Protocol)", systemImage: "exclamationmark.triangle.fill")
-                                .font(.subheadline)
-                                .foregroundStyle(.orange)
-                            
-                            Text("This printer uses the ACT protocol. Files cannot be uploaded over the network — they must be copied to USB manually. Enter the filename as it appears on the printer's USB drive to start printing.")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                            Label(
+                                "Resin Printer (ACT Protocol)",
+                                systemImage: "exclamationmark.triangle.fill"
+                            )
+                            .font(.subheadline)
+                            .foregroundStyle(.orange)
+
+                            Text(
+                                "This printer uses the ACT protocol. Files cannot be uploaded over the network — they must be copied to USB manually. Enter the filename as it appears on the printer's USB drive to start printing."
+                            )
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                         }
-                        
+
                         TextField("Filename on USB (e.g. model.pwmx)", text: $actFilename)
                             #if os(iOS)
-                            .textContentType(.none)
+                                .textContentType(.none)
                             #endif
                     } header: {
                         Text("Print File")
@@ -224,13 +245,13 @@ struct PrintJobView: View {
                         Toggle("Start printing after upload", isOn: $startPrintAfterUpload)
                     }
                 }
-                
+
                 if isUploading {
                     Section("Progress") {
                         VStack(spacing: 12) {
                             ProgressView(value: uploadProgress)
                                 .animation(.easeInOut(duration: 0.3), value: uploadProgress)
-                            
+
                             HStack {
                                 phaseIcon
                                 Text(phaseDescription)
@@ -247,7 +268,7 @@ struct PrintJobView: View {
                         }
                     }
                 }
-                
+
                 if let error = uploadError {
                     Section {
                         Label {
@@ -257,7 +278,7 @@ struct PrintJobView: View {
                             Image(systemName: "exclamationmark.triangle.fill")
                                 .foregroundStyle(.red)
                         }
-                        
+
                         Button("Retry") {
                             sendToPrinter()
                         }
@@ -267,7 +288,7 @@ struct PrintJobView: View {
             }
             .navigationTitle("Send to Printer")
             #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
+                .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -276,7 +297,7 @@ struct PrintJobView: View {
                     }
                     .disabled(isUploading)
                 }
-                
+
                 ToolbarItem(placement: .confirmationAction) {
                     Button(isACTPrinter ? "Print" : "Send") {
                         sendToPrinter()
@@ -289,22 +310,22 @@ struct PrintJobView: View {
             }
         }
     }
-    
+
     /// Whether the send/print button should be disabled
     private var sendButtonDisabled: Bool {
         if selectedPrinter == nil || isUploading { return true }
         if isACTPrinter && actFilename.trimmingCharacters(in: .whitespaces).isEmpty { return true }
         return false
     }
-    
+
     /// Pre-select the default printer from settings if available
     private func preselectDefaultPrinter() {
         guard selectedPrinter == nil, !defaultPrinterID.isEmpty else { return }
         selectedPrinter = printers.first { $0.id.uuidString == defaultPrinterID }
     }
-    
+
     // MARK: - Phase Display
-    
+
     private var phaseIcon: some View {
         Group {
             switch uploadPhase {
@@ -328,7 +349,7 @@ struct PrintJobView: View {
             }
         }
     }
-    
+
     private var phaseDescription: String {
         switch uploadPhase {
         case .idle: return ""
@@ -339,30 +360,21 @@ struct PrintJobView: View {
         case .failed(let msg): return msg
         }
     }
-    
+
     // MARK: - Upload
-    
-    private static func formatCost(_ cost: Double, currency: String) -> String {
-        let symbol: String
-        switch currency {
-        case "EUR": symbol = "\u{20AC}"
-        case "GBP": symbol = "\u{00A3}"
-        case "JPY": symbol = "\u{00A5}"
-        case "CAD": symbol = "CA$"
-        case "AUD": symbol = "A$"
-        default: symbol = "$"
-        }
-        return "\(symbol)\(String(format: "%.2f", cost))"
+
+    private static func formatCostLocal(_ cost: Double, currency: String) -> String {
+        formatCost(cost, currency: currency)
     }
 
     private func sendToPrinter() {
         guard let printer = selectedPrinter else { return }
-        
+
         isUploading = true
         uploadError = nil
         uploadProgress = 0
         uploadPhase = .preparing
-        
+
         Task {
             // Create print job record
             let fileName = isACTPrinter ? actFilename : "\(model.name).stl"
@@ -377,7 +389,7 @@ struct PrintJobView: View {
             job.resinProfile = selectedResinProfile
             model.printJobs.append(job)
             modelContext.insert(job)
-            
+
             do {
                 if isACTPrinter {
                     // ACT protocol — send goprint command directly (file must be on USB)
@@ -385,27 +397,27 @@ struct PrintJobView: View {
                         uploadPhase = .startingPrint
                         uploadProgress = 0.5
                     }
-                    
-                    let api = AnycubicPrinterAPI()
+
+                    let api = AnycubicPrinterAPI.shared
                     try await api.startPrint(
                         ipAddress: printer.ipAddress,
                         apiKey: printer.apiKey,
                         filename: actFilename.trimmingCharacters(in: .whitespaces),
                         protocol: printer.printerProtocol
                     )
-                    
+
                     job.status = .printing
                     job.printStartDate = Date()
-                    
+
                 } else {
                     // HTTP protocol — upload file then optionally start print
                     let fileURL = model.resolvedFileURL
-                    let api = AnycubicPrinterAPI()
-                    
+                    let api = AnycubicPrinterAPI.shared
+
                     await MainActor.run {
                         uploadPhase = .uploading
                     }
-                    
+
                     try await api.uploadFile(
                         ipAddress: printer.ipAddress,
                         apiKey: printer.apiKey,
@@ -416,12 +428,12 @@ struct PrintJobView: View {
                             uploadProgress = progress
                         }
                     }
-                    
+
                     if startPrintAfterUpload {
                         await MainActor.run {
                             uploadPhase = .startingPrint
                         }
-                        
+
                         job.status = .printing
                         job.printStartDate = Date()
                         try await api.startPrint(
@@ -434,27 +446,27 @@ struct PrintJobView: View {
                         job.status = .queued
                     }
                 }
-                
+
                 // Update printer connection status
                 printer.isConnected = true
                 printer.lastConnected = Date()
-                
+
                 await MainActor.run {
                     uploadPhase = .complete
                     uploadProgress = 1.0
                     isUploading = false
-                    
+
                     Task {
                         try? await Task.sleep(for: .seconds(1))
                         dismiss()
                     }
                 }
-                
+
             } catch {
                 // Rollback: mark the job as failed instead of leaving it in uploading state
                 job.status = .failed
                 job.endDate = Date()
-                
+
                 await MainActor.run {
                     isUploading = false
                     uploadPhase = .failed(error.localizedDescription)

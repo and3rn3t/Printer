@@ -103,8 +103,8 @@ final class PrinterConnectionManager {
 
     // MARK: - Private Properties
 
-    private let api = AnycubicPrinterAPI()
-    private let photonService = PhotonPrinterService()
+    private let api = AnycubicPrinterAPI.shared
+    private let photonService = PhotonPrinterService.shared
     private var pollingTask: Task<Void, Never>?
     private var printer: Printer?
 
@@ -548,10 +548,10 @@ final class PrinterConnectionManager {
     /// Start time-lapse snapshot capture for an OctoPrint print
     private func startTimelapseCapture(printerIP: String, apiKey: String?, job: PrintJob) {
         guard let context = modelContext else { return }
-        let api = AnycubicPrinterAPI()
+        let captureAPI = AnycubicPrinterAPI.shared
 
         Task {
-            guard let snapshotURL = await api.getWebcamSnapshotURL(ipAddress: printerIP, apiKey: apiKey) else { return }
+            guard let snapshotURL = await captureAPI.getWebcamSnapshotURL(ipAddress: printerIP, apiKey: apiKey) else { return }
             await TimelapseCapture.shared.startCapture(snapshotURL: snapshotURL, job: job, modelContext: context)
         }
     }

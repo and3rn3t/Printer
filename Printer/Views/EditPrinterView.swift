@@ -220,7 +220,7 @@ struct EditPrinterView: View {
 
         Task {
             do {
-                let api = AnycubicPrinterAPI()
+                let api = AnycubicPrinterAPI.shared
                 let connected = try await api.testConnection(ipAddress: ipAddress)
                 await MainActor.run {
                     connectionTestResult = .success(connected)

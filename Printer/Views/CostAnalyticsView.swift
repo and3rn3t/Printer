@@ -176,13 +176,13 @@ struct CostAnalyticsView: View {
         LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
             costCard(
                 title: "Period Spend",
-                value: formatCost(totalCostInRange),
+                value: formatLocalCost(totalCostInRange),
                 icon: "creditcard",
                 color: .blue
             )
             costCard(
                 title: "Avg per Job",
-                value: formatCost(averageCostPerJob),
+                value: formatLocalCost(averageCostPerJob),
                 icon: "chart.bar",
                 color: .green
             )
@@ -194,7 +194,7 @@ struct CostAnalyticsView: View {
             )
             costCard(
                 title: "All-time Spend",
-                value: formatCost(totalCostAllTime),
+                value: formatLocalCost(totalCostAllTime),
                 icon: "banknote",
                 color: .purple
             )
@@ -233,7 +233,7 @@ struct CostAnalyticsView: View {
                     .font(.subheadline)
                     .fontWeight(.medium)
                 Spacer()
-                Text(formatCost(monthlyBudget))
+                Text(formatLocalCost(monthlyBudget))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
@@ -243,12 +243,12 @@ struct CostAnalyticsView: View {
 
             ProgressView(value: min(ratio, 1.0)) {
                 HStack {
-                    Text("Spent: \(formatCost(currentMonthSpend))")
+                    Text("Spent: \(formatLocalCost(currentMonthSpend))")
                         .font(.caption)
                         .fontWeight(.medium)
                         .foregroundStyle(isOver ? .red : .primary)
                     Spacer()
-                    Text(isOver ? "Over budget!" : "\(formatCost(monthlyBudget - currentMonthSpend)) remaining")
+                    Text(isOver ? "Over budget!" : "\(formatLocalCost(monthlyBudget - currentMonthSpend)) remaining")
                         .font(.caption)
                         .foregroundStyle(isOver ? .red : .green)
                 }
@@ -282,7 +282,7 @@ struct CostAnalyticsView: View {
                 AxisMarks(position: .leading) { value in
                     AxisValueLabel {
                         if let v = value.as(Double.self) {
-                            Text(formatCostShort(v))
+                            Text(formatLocalCostShort(v))
                         }
                     }
                 }
@@ -333,7 +333,7 @@ struct CostAnalyticsView: View {
                 .foregroundStyle(.cyan.gradient)
                 .cornerRadius(4)
                 .annotation(position: .trailing) {
-                    Text(formatCostShort(entry.cost))
+                    Text(formatLocalCostShort(entry.cost))
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
@@ -380,7 +380,7 @@ struct CostAnalyticsView: View {
 
                                 Spacer()
 
-                                Text(formatCost(entry.cost))
+                                Text(formatLocalCost(entry.cost))
                                     .font(.subheadline)
                                     .fontWeight(.semibold)
                                     .foregroundStyle(.blue)
@@ -403,25 +403,15 @@ struct CostAnalyticsView: View {
 
     // MARK: - Formatting
 
-    private var currencySymbol: String {
-        switch resinCurrency {
-        case "EUR": return "\u{20AC}"
-        case "GBP": return "\u{00A3}"
-        case "JPY": return "\u{00A5}"
-        case "CAD": return "CA$"
-        case "AUD": return "A$"
-        default: return "$"
-        }
+    private var costSymbol: String {
+        currencySymbol(for: resinCurrency)
     }
 
-    private func formatCost(_ value: Double) -> String {
-        "\(currencySymbol)\(String(format: "%.2f", value))"
+    private func formatLocalCost(_ value: Double) -> String {
+        formatCost(value, currency: resinCurrency)
     }
 
-    private func formatCostShort(_ value: Double) -> String {
-        if value >= 1000 {
-            return "\(currencySymbol)\(String(format: "%.0fk", value / 1000))"
-        }
-        return "\(currencySymbol)\(String(format: "%.0f", value))"
+    private func formatLocalCostShort(_ value: Double) -> String {
+        formatCostShort(value, currency: resinCurrency)
     }
 }

@@ -93,7 +93,7 @@ struct PrinterFileBrowserView: View {
         defer { isLoading = false }
         
         do {
-            let api = AnycubicPrinterAPI()
+            let api = AnycubicPrinterAPI.shared
             let result = try await api.listFiles(
                 ipAddress: printer.ipAddress,
                 apiKey: printer.apiKey
@@ -109,7 +109,7 @@ struct PrinterFileBrowserView: View {
         isPrinting = true
         Task {
             do {
-                let api = AnycubicPrinterAPI()
+                let api = AnycubicPrinterAPI.shared
                 try await api.startPrint(
                     ipAddress: printer.ipAddress,
                     apiKey: printer.apiKey,
@@ -128,7 +128,7 @@ struct PrinterFileBrowserView: View {
     private func deleteFile(_ file: PrinterFile) {
         Task {
             do {
-                let api = AnycubicPrinterAPI()
+                let api = AnycubicPrinterAPI.shared
                 try await api.deleteFile(
                     ipAddress: printer.ipAddress,
                     apiKey: printer.apiKey,

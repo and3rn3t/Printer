@@ -199,7 +199,7 @@ final class PrinterDiscovery {
         }
         
         // Get system info via ACT protocol
-        let photon = PhotonPrinterService()
+        let photon = PhotonPrinterService.shared
         do {
             let sysInfo = try await photon.getSystemInfo(ipAddress: ipAddress)
             return DiscoveredPrinter(

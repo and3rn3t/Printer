@@ -164,7 +164,7 @@ struct PrinterRowView: View {
         checkTask = Task {
             // Quick probe to update row status
             if printer.printerProtocol == .act {
-                let service = PhotonPrinterService()
+                let service = PhotonPrinterService.shared
                 if let status = try? await service.getStatus(
                     ipAddress: printer.ipAddress,
                     port: printer.port
@@ -386,7 +386,7 @@ struct AddPrinterView: View {
         
         Task {
             do {
-                let api = AnycubicPrinterAPI()
+                let api = AnycubicPrinterAPI.shared
                 let connected = try await api.testConnection(ipAddress: ipAddress)
                 
                 await MainActor.run {

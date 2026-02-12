@@ -9,6 +9,77 @@ import SwiftUI
 import SwiftData
 import UniformTypeIdentifiers
 
+// MARK: - Shared File Import Helper
+
+/// Import a single file URL into a `PrintModel`, handling conversion, thumbnailing, and metadata extraction.
+/// Used by both file importer and drag & drop handlers.
+@discardableResult
+func importModelFile(url: URL, into context: ModelContext) async throws -> PrintModel {
+    let converter = ModelConverter()
+    let ext = url.pathExtension.lowercased()
+    let fileType = ModelFileType.from(path: url.path)
+
+    // Convert mesh formats if needed
+    let importURL: URL
+    if ext == "obj" {
+        importURL = try await converter.convertOBJToSTL(objURL: url)
+    } else if ext == "usdz" {
+        importURL = try await converter.convertUSDZToSTL(usdzURL: url)
+    } else {
+        importURL = url
+    }
+
+    // Import the file
+    let (fileURL, fileSize) = try await STLFileManager.shared.importSTL(from: importURL)
+    let relativePath = await STLFileManager.shared.relativePath(for: fileURL)
+
+    // Generate thumbnail
+    var thumbnailData: Data?
+    if fileType.needsSlicing && ["stl", "obj", "usdz"].contains(ext) {
+        thumbnailData = try? await converter.generateThumbnail(from: fileURL)
+    } else if fileType.isSliced {
+        let parser = SlicedFileParser()
+        thumbnailData = await parser.extractThumbnail(from: fileURL)
+    }
+
+    // Extract sliced file metadata
+    var slicedMetadata: SlicedFileMetadata?
+    if fileType.isSliced {
+        let parser = SlicedFileParser()
+        slicedMetadata = await parser.parseMetadata(from: fileURL)
+    }
+
+    // Create model entry
+    let model = await MainActor.run {
+        let m = PrintModel(
+            name: url.deletingPathExtension().lastPathComponent,
+            fileURL: relativePath,
+            fileSize: fileSize,
+            source: .imported,
+            thumbnailData: thumbnailData
+        )
+        if let metadata = slicedMetadata {
+            m.applyMetadata(metadata)
+        }
+        context.insert(m)
+        return m
+    }
+
+    // Analyze mesh dimensions for mesh formats
+    if fileType.needsSlicing {
+        let analyzer = MeshAnalyzer()
+        if let info = try? await analyzer.analyze(url: fileURL) {
+            await MainActor.run {
+                model.applyMeshInfo(info)
+            }
+        }
+    }
+
+    return model
+}
+
+// MARK: - Content View
+
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \PrintModel.modifiedDate, order: .reverse) private var models: [PrintModel]
@@ -119,17 +190,19 @@ struct ContentView: View {
             ModelListView(
                 models: models,
                 selectedModel: $selectedModel,
-                showingScanner: $showingScanner,
-                showingImporter: $showingImporter,
-                showingPrintables: $showingPrintables,
-                showingPrintHistory: $showingPrintHistory,
-                showingPrinterSetup: $showingPrinterSetup,
-                showingSettings: $showingSettings,
-                showingPrintQueue: $showingPrintQueue,
-                showingStatistics: $showingStatistics,
-                showingCollections: $showingCollections,
-                showingTagBrowser: $showingTagBrowser,
-                onDelete: deleteModels
+                actions: .init(
+                    showScanner: { showingScanner = true },
+                    showImporter: { showingImporter = true },
+                    showPrintables: { showingPrintables = true },
+                    showPrintHistory: { showingPrintHistory = true },
+                    showPrinterSetup: { showingPrinterSetup = true },
+                    showSettings: { showingSettings = true },
+                    showPrintQueue: { showingPrintQueue = true },
+                    showStatistics: { showingStatistics = true },
+                    showCollections: { showingCollections = true },
+                    showTagBrowser: { showingTagBrowser = true },
+                    onDelete: deleteModels
+                )
             )
         } detail: {
             if let model = selectedModel {
@@ -247,79 +320,14 @@ struct ContentView: View {
     private func handleImportedFiles(result: Result<[URL], Error>) async {
         do {
             let urls = try result.get()
-            let converter = ModelConverter()
             
             for url in urls {
-                // Start accessing security-scoped resource
                 guard url.startAccessingSecurityScopedResource() else { continue }
                 defer { url.stopAccessingSecurityScopedResource() }
                 
-                let ext = url.pathExtension.lowercased()
-                let fileType = ModelFileType.from(path: url.path)
-                
-                // Determine the file to import
-                let importURL: URL
-                if ext == "obj" || ext == "usdz" {
-                    // Convert mesh formats to STL
-                    if ext == "obj" {
-                        importURL = try await converter.convertOBJToSTL(objURL: url)
-                    } else {
-                        importURL = try await converter.convertUSDZToSTL(usdzURL: url)
-                    }
-                } else {
-                    // STL, 3MF, and sliced formats (gcode, pwmx, ctb) — import as-is
-                    importURL = url
-                }
-                
-                // Import the file
-                let (fileURL, fileSize) = try await STLFileManager.shared.importSTL(from: importURL)
-                
-                // Generate thumbnail — SceneKit for mesh formats, binary extraction for sliced files
-                var thumbnailData: Data?
-                if fileType.needsSlicing && (ext == "stl" || ext == "obj" || ext == "usdz") {
-                    thumbnailData = try? await converter.generateThumbnail(from: fileURL)
-                } else if fileType.isSliced {
-                    let parser = SlicedFileParser()
-                    thumbnailData = await parser.extractThumbnail(from: fileURL)
-                }
-                
-                // Store as relative path for container resilience
-                let relativePath = await STLFileManager.shared.relativePath(for: fileURL)
-                
-                // Extract sliced file metadata if applicable
-                var slicedMetadata: SlicedFileMetadata?
-                if fileType.isSliced {
-                    let parser = SlicedFileParser()
-                    slicedMetadata = await parser.parseMetadata(from: fileURL)
-                }
-                
-                // Create model entry
+                let model = try await importModelFile(url: url, into: modelContext)
                 await MainActor.run {
-                    let model = PrintModel(
-                        name: url.deletingPathExtension().lastPathComponent,
-                        fileURL: relativePath,
-                        fileSize: fileSize,
-                        source: .imported,
-                        thumbnailData: thumbnailData
-                    )
-                    
-                    // Apply sliced file metadata if parsed
-                    if let metadata = slicedMetadata {
-                        model.applyMetadata(metadata)
-                    }
-                    
-                    modelContext.insert(model)
                     selectedModel = model
-                }
-
-                // Analyze mesh dimensions for mesh formats
-                if fileType.needsSlicing {
-                    let analyzer = MeshAnalyzer()
-                    if let info = try? await analyzer.analyze(url: fileURL) {
-                        await MainActor.run {
-                            selectedModel?.applyMeshInfo(info)
-                        }
-                    }
                 }
             }
         } catch {
@@ -336,17 +344,23 @@ struct ContentView: View {
 struct ModelListView: View {
     let models: [PrintModel]
     @Binding var selectedModel: PrintModel?
-    @Binding var showingScanner: Bool
-    @Binding var showingImporter: Bool
-    @Binding var showingPrintables: Bool
-    @Binding var showingPrintHistory: Bool
-    @Binding var showingPrinterSetup: Bool
-    @Binding var showingSettings: Bool
-    @Binding var showingPrintQueue: Bool
-    @Binding var showingStatistics: Bool
-    @Binding var showingCollections: Bool
-    @Binding var showingTagBrowser: Bool
-    let onDelete: (IndexSet) -> Void
+
+    /// Actions the list can trigger on its parent
+    struct Actions {
+        var showScanner: () -> Void = {}
+        var showImporter: () -> Void = {}
+        var showPrintables: () -> Void = {}
+        var showPrintHistory: () -> Void = {}
+        var showPrinterSetup: () -> Void = {}
+        var showSettings: () -> Void = {}
+        var showPrintQueue: () -> Void = {}
+        var showStatistics: () -> Void = {}
+        var showCollections: () -> Void = {}
+        var showTagBrowser: () -> Void = {}
+        var onDelete: (IndexSet) -> Void = { _ in }
+    }
+
+    var actions: Actions
 
     @Environment(\.modelContext) private var modelContext
     @AppStorage("defaultSortOption") private var sortOptionRaw = "Date (Newest)"
@@ -425,7 +439,7 @@ struct ModelListView: View {
                     
                     VStack(spacing: 12) {
                         Button {
-                            showingScanner = true
+                            actions.showScanner()
                         } label: {
                             HStack {
                                 Image(systemName: "camera.fill")
@@ -437,7 +451,7 @@ struct ModelListView: View {
                         .controlSize(.large)
                         
                         Button {
-                            showingImporter = true
+                            actions.showImporter()
                         } label: {
                             HStack {
                                 Image(systemName: "square.and.arrow.down.fill")
@@ -517,7 +531,7 @@ struct ModelListView: View {
                                 .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                                     Button(role: .destructive) {
                                         if let idx = models.firstIndex(of: model) {
-                                            onDelete(IndexSet(integer: idx))
+                                            actions.onDelete(IndexSet(integer: idx))
                                         }
                                     } label: {
                                         Label("Delete", systemImage: "trash")
@@ -581,13 +595,13 @@ struct ModelListView: View {
         ToolbarItem(placement: .primaryAction) {
             Menu {
                 Button {
-                    showingScanner = true
+                    actions.showScanner()
                 } label: {
                     Label("Scan Object", systemImage: "camera.fill")
                 }
 
                 Button {
-                    showingImporter = true
+                    actions.showImporter()
                 } label: {
                     Label("Import File", systemImage: "square.and.arrow.down")
                 }
@@ -598,7 +612,7 @@ struct ModelListView: View {
 
         ToolbarItem(placement: .primaryAction) {
             Button {
-                showingPrintables = true
+                actions.showPrintables()
             } label: {
                 Label("Printables", systemImage: "globe")
             }
@@ -610,7 +624,7 @@ struct ModelListView: View {
 
         ToolbarItem(placement: .primaryAction) {
             Button {
-                showingPrintQueue = true
+                actions.showPrintQueue()
             } label: {
                 Label("Print Queue", systemImage: "list.number")
             }
@@ -619,25 +633,25 @@ struct ModelListView: View {
         ToolbarItem(placement: .primaryAction) {
             Menu {
                 Button {
-                    showingPrintHistory = true
+                    actions.showPrintHistory()
                 } label: {
                     Label("History", systemImage: "clock.arrow.circlepath")
                 }
 
                 Button {
-                    showingStatistics = true
+                    actions.showStatistics()
                 } label: {
                     Label("Statistics", systemImage: "chart.bar.fill")
                 }
 
                 Button {
-                    showingCollections = true
+                    actions.showCollections()
                 } label: {
                     Label("Collections", systemImage: "folder")
                 }
 
                 Button {
-                    showingTagBrowser = true
+                    actions.showTagBrowser()
                 } label: {
                     Label("Tags", systemImage: "tag")
                 }
@@ -648,7 +662,7 @@ struct ModelListView: View {
 
         ToolbarItem(placement: .primaryAction) {
             Button {
-                showingPrinterSetup = true
+                actions.showPrinterSetup()
             } label: {
                 Label("Printers", systemImage: "printer")
             }
@@ -656,7 +670,7 @@ struct ModelListView: View {
 
         ToolbarItem(placement: .primaryAction) {
             Button {
-                showingSettings = true
+                actions.showSettings()
             } label: {
                 Label("Settings", systemImage: "gear")
             }
@@ -772,7 +786,7 @@ struct ModelListView: View {
         withAnimation {
             for model in models where selectedModelIDs.contains(model.id) {
                 if let idx = models.firstIndex(of: model) {
-                    onDelete(IndexSet(integer: idx))
+                    actions.onDelete(IndexSet(integer: idx))
                 }
             }
             selectedModelIDs.removeAll()
@@ -782,78 +796,21 @@ struct ModelListView: View {
 
     /// Handle URLs dropped onto the model list (drag & drop import)
     private func handleDroppedURLs(_ urls: [URL]) {
+        let context = modelContext
         Task {
-            let converter = ModelConverter()
-            let context = modelContext
+            let supported = Set(["stl", "obj", "usdz", "3mf", "gcode", "pwmx", "pwma", "ctb"])
 
             for url in urls {
                 let ext = url.pathExtension.lowercased()
-                let supported = ["stl", "obj", "usdz", "3mf", "gcode", "pwmx", "pwma", "ctb"]
                 guard supported.contains(ext) else { continue }
 
-                // Ensure we can access the file
                 let accessing = url.startAccessingSecurityScopedResource()
                 defer { if accessing { url.stopAccessingSecurityScopedResource() } }
 
                 guard FileManager.default.fileExists(atPath: url.path) else { continue }
 
-                let fileType = ModelFileType.from(path: url.path)
-
                 do {
-                    let importURL: URL
-                    if ext == "obj" {
-                        importURL = try await converter.convertOBJToSTL(objURL: url)
-                    } else if ext == "usdz" {
-                        importURL = try await converter.convertUSDZToSTL(usdzURL: url)
-                    } else {
-                        importURL = url
-                    }
-
-                    let (fileURL, fileSize) = try await STLFileManager.shared.importSTL(from: importURL)
-                    let relativePath = await STLFileManager.shared.relativePath(for: fileURL)
-
-                    var thumbnailData: Data?
-                    if fileType.needsSlicing && ["stl", "obj", "usdz"].contains(ext) {
-                        thumbnailData = try? await converter.generateThumbnail(from: fileURL)
-                    } else if fileType.isSliced {
-                        let parser = SlicedFileParser()
-                        thumbnailData = await parser.extractThumbnail(from: fileURL)
-                    }
-
-                    var slicedMetadata: SlicedFileMetadata?
-                    if fileType.isSliced {
-                        let parser = SlicedFileParser()
-                        slicedMetadata = await parser.parseMetadata(from: fileURL)
-                    }
-
-                    await MainActor.run {
-                        let model = PrintModel(
-                            name: url.deletingPathExtension().lastPathComponent,
-                            fileURL: relativePath,
-                            fileSize: fileSize,
-                            source: .imported,
-                            thumbnailData: thumbnailData
-                        )
-                        if let metadata = slicedMetadata {
-                            model.applyMetadata(metadata)
-                        }
-                        context.insert(model)
-                    }
-
-                    // Analyze dimensions for mesh formats
-                    if fileType.needsSlicing {
-                        let analyzer = MeshAnalyzer()
-                        if let info = try? await analyzer.analyze(url: fileURL) {
-                            await MainActor.run {
-                                let descriptor = FetchDescriptor<PrintModel>(
-                                    sortBy: [SortDescriptor(\.modifiedDate, order: .reverse)]
-                                )
-                                if let latest = try? context.fetch(descriptor).first {
-                                    latest.applyMeshInfo(info)
-                                }
-                            }
-                        }
-                    }
+                    try await importModelFile(url: url, into: context)
                 } catch {
                     // Silently skip failed drops
                 }

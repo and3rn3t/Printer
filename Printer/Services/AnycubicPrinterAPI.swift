@@ -110,11 +110,14 @@ actor AnycubicPrinterAPI {
 
     // MARK: - Properties
 
+    /// Shared singleton instance — avoids creating redundant URLSession instances
+    static let shared = AnycubicPrinterAPI()
+
     private let urlSession: URLSession
     private var uploadDelegates: [UUID: UploadProgressDelegate] = [:]
     
     /// ACT protocol service for Photon resin printers
-    private let photonService = PhotonPrinterService()
+    private let photonService = PhotonPrinterService.shared
 
     // MARK: - Initialization
 

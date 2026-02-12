@@ -206,7 +206,7 @@ struct PrinterDetailView: View {
             // Fetch webcam URL for OctoPrint printers
             if printer.printerProtocol == .octoprint {
                 Task {
-                    let api = AnycubicPrinterAPI()
+                    let api = AnycubicPrinterAPI.shared
                     let url = await api.getWebcamSnapshotURL(
                         ipAddress: printer.ipAddress,
                         apiKey: printer.apiKey
