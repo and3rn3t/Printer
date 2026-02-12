@@ -80,6 +80,7 @@ jobs:
             -scheme "$SCHEME" \
             -destination "${{ steps.setup.outputs.destination }}" \
             -configuration Debug \
+            -only-testing:PrinterTests \
             -jobs $(sysctl -n hw.ncpu) \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
@@ -98,6 +99,7 @@ jobs:
             -project "$PROJECT" \
             -scheme "$SCHEME" \
             -destination "${{ steps.setup.outputs.destination }}" \
+            -only-testing:PrinterTests \
             -resultBundlePath TestResults.xcresult \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
