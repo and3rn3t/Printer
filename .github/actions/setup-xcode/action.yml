@@ -70,9 +70,25 @@ runs:
     - name: Install xcbeautify
       if: inputs.install-xcbeautify == 'true'
       shell: bash
-      run: command -v xcbeautify &>/dev/null || brew install xcbeautify
+      run: |
+        if command -v xcbeautify &>/dev/null; then
+          echo "xcbeautify already available"
+        elif [ -d "/opt/homebrew/Cellar/xcbeautify" ]; then
+          echo "xcbeautify cellar found from cache, relinking…"
+          brew link xcbeautify
+        else
+          brew install xcbeautify
+        fi
 
     - name: Install SwiftLint
       if: inputs.install-swiftlint == 'true'
       shell: bash
-      run: command -v swiftlint &>/dev/null || brew install swiftlint
+      run: |
+        if command -v swiftlint &>/dev/null; then
+          echo "SwiftLint already available: $(swiftlint version)"
+        elif [ -d "/opt/homebrew/Cellar/swiftlint" ]; then
+          echo "SwiftLint cellar found from cache, relinking…"
+          brew link swiftlint
+        else
+          brew install swiftlint
+        fi
