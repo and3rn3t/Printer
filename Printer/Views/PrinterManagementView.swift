@@ -14,7 +14,7 @@ struct PrinterManagementView: View {
     @Query private var printers: [Printer]
 
     @State private var showingAddPrinter = false
-    @State private var networkMonitor = NetworkMonitor()
+    @State private var networkMonitor = NetworkMonitor.shared
 
     var body: some View {
         NavigationStack {
@@ -177,8 +177,8 @@ struct PrinterRowView: View {
                     }
                 }
             } else {
-                let api = AnycubicPrinterAPI()
-                let reachable = await api.isReachable(ipAddress: printer.ipAddress)
+                let api = AnycubicPrinterAPI.shared
+                let reachable = await api.isReachable(ipAddress: printer.ipAddress, knownProtocol: printer.printerProtocol)
                 await MainActor.run {
                     isReachable = reachable
                     printer.isConnected = reachable

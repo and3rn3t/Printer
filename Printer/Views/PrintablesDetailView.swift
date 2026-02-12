@@ -345,7 +345,7 @@ struct PrintablesDetailView: View {
 
                 // Fall back to SceneKit rendering if no image available
                 if thumbnailData == nil {
-                    let converter = ModelConverter()
+                    let converter = ModelConverter.shared
                     thumbnailData = try? await converter.generateThumbnail(from: savedURL)
                 }
 
@@ -354,13 +354,13 @@ struct PrintablesDetailView: View {
 
                 // Fall back to embedded sliced file thumbnail
                 if thumbnailData == nil && fileModelType.isSliced {
-                    let parser = SlicedFileParser()
+                    let parser = SlicedFileParser.shared
                     thumbnailData = await parser.extractThumbnail(from: savedURL)
                 }
 
                 var slicedMetadata: SlicedFileMetadata?
                 if fileModelType.isSliced {
-                    let parser = SlicedFileParser()
+                    let parser = SlicedFileParser.shared
                     slicedMetadata = await parser.parseMetadata(from: savedURL)
                 }
 

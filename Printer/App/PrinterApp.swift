@@ -57,6 +57,12 @@ struct PrinterApp: App {
         #if os(iOS)
         BackgroundPrintMonitor.shared.registerBackgroundTask()
         #endif
+
+        // Inject shared container into background monitor to avoid per-poll creation
+        let container = sharedModelContainer
+        Task {
+            await BackgroundPrintMonitor.shared.configure(with: container)
+        }
     }
 
     var body: some Scene {

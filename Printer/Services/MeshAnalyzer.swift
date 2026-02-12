@@ -15,6 +15,9 @@ import SceneKit.ModelIO
 /// Uses ModelIO to load STL/OBJ/USDZ assets and compute spatial information.
 actor MeshAnalyzer {
 
+    /// Shared singleton — this actor is stateless
+    static let shared = MeshAnalyzer()
+
     /// Result of a mesh analysis
     struct MeshInfo: Sendable {
         /// Width (X) in millimeters

@@ -125,6 +125,42 @@ actor STLFileManager {
         return data.count >= expectedSize
     }
 
+    /// Validate an STL file by reading only the header (84 bytes) instead of the entire file.
+    /// Much more efficient for large models.
+    func validateSTL(at url: URL) -> Bool {
+        guard let handle = try? FileHandle(forReadingFrom: url) else { return false }
+        defer { try? handle.close() }
+
+        guard let header = try? handle.read(upToCount: 84), header.count >= 5 else { return false }
+
+        // Check for ASCII STL (starts with "solid")
+        if let prefix = String(data: header.prefix(5), encoding: .utf8),
+           prefix.lowercased() == "solid" {
+            // For ASCII we need an endsolid check — read a small tail
+            guard let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
+                  let fileSize = attrs[.size] as? Int64, fileSize > 8
+            else { return false }
+            try? handle.seek(toOffset: UInt64(max(0, fileSize - 64)))
+            if let tail = try? handle.readToEnd(),
+               let text = String(data: tail, encoding: .utf8),
+               text.contains("endsolid") {
+                return true
+            }
+            return false
+        }
+
+        // Binary STL: header (80) + triangle count (4) + triangles (n*50)
+        guard header.count >= 84 else { return false }
+        let triangleCount: UInt32 = header.withUnsafeBytes { buffer in
+            buffer.load(fromByteOffset: 80, as: UInt32.self)
+        }
+        let expectedSize = Int64(84) + Int64(triangleCount) * 50
+        guard let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
+              let fileSize = attrs[.size] as? Int64
+        else { return false }
+        return fileSize >= expectedSize
+    }
+
     /// Save STL data to the STL directory with the given filename
     func saveSTL(data: Data, filename: String) async throws -> (url: URL, size: Int64) {
         let destinationURL = try stlDirectory.appendingPathComponent(filename)

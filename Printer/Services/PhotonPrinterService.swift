@@ -113,40 +113,59 @@ actor PhotonPrinterService {
     /// Command timeout in seconds
     private let commandTimeout: TimeInterval = 5
 
-    // MARK: - Connection Management
+    /// How long an idle connection stays alive before being torn down
+    private let connectionIdleTimeout: TimeInterval = 30
 
-    /// Send a command and receive the response
-    ///
-    /// Opens a fresh TCP connection for each command to avoid stale connection issues.
-    /// The Photon's TCP server handles concurrent connections.
-    private func sendCommand(
-        ipAddress: String,
-        port: Int = PhotonPrinterService.defaultPort,
-        command: String
-    ) async throws -> [String] {
-        AppLogger.network.debug("ACT send \(command) → \(ipAddress):\(port)")
+    // MARK: - Persistent Connection Pool
 
-        // Create TCP connection
+    /// Cached connections keyed by "ip:port"
+    private var connectionPool: [String: PooledConnection] = [:]
+
+    /// A reusable TCP connection with idle-timeout tracking
+    private struct PooledConnection {
+        let connection: NWConnection
+        var lastUsed: Date
+        let key: String
+    }
+
+    /// Retrieve or create a connection for the given endpoint.
+    /// Reuses an existing `.ready` connection when available.
+    private func getConnection(ipAddress: String, port: Int) async throws -> NWConnection {
+        let key = "\(ipAddress):\(port)"
+
+        // Reuse existing connection if it's still ready
+        if let pooled = connectionPool[key], pooled.connection.state == .ready {
+            connectionPool[key]?.lastUsed = Date()
+            return pooled.connection
+        }
+
+        // Clean up stale entry if present
+        if let pooled = connectionPool[key] {
+            pooled.connection.cancel()
+            connectionPool.removeValue(forKey: key)
+        }
+
+        // Create a new connection
         let connection = NWConnection(
             host: NWEndpoint.Host(ipAddress),
             port: NWEndpoint.Port(integerLiteral: UInt16(port)),
             using: .tcp
         )
 
-        return try await withCheckedThrowingContinuation { continuation in
-            // Thread-safe guard to ensure continuation is resumed exactly once
+        // Wait for connection to become ready
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             let resumeGuard = SendOnce()
 
             connection.stateUpdateHandler = { state in
                 switch state {
+                case .ready:
+                    if resumeGuard.tryAcquire() {
+                        continuation.resume()
+                    }
                 case .failed(let error):
-                    AppLogger.network.error(
-                        "ACT connection failed to \(ipAddress):\(port): \(error.localizedDescription)"
-                    )
                     if resumeGuard.tryAcquire() {
                         connection.cancel()
-                        continuation.resume(
-                            throwing: PhotonError.connectionFailed(error.localizedDescription))
+                        continuation.resume(throwing: PhotonError.connectionFailed(error.localizedDescription))
                     }
                 case .cancelled:
                     if resumeGuard.tryAcquire() {
@@ -159,14 +178,95 @@ actor PhotonPrinterService {
 
             connection.start(queue: .global(qos: .userInitiated))
 
-            // Send command
+            DispatchQueue.global().asyncAfter(deadline: .now() + self.commandTimeout) {
+                if resumeGuard.tryAcquire() {
+                    connection.cancel()
+                    continuation.resume(throwing: PhotonError.timeout)
+                }
+            }
+        }
+
+        // Clear the state handler so future state changes don't interfere with command continuations
+        connection.stateUpdateHandler = { [weak self] state in
+            if case .failed = state {
+                Task { await self?.removeConnection(key: key) }
+            } else if case .cancelled = state {
+                Task { await self?.removeConnection(key: key) }
+            }
+        }
+
+        connectionPool[key] = PooledConnection(connection: connection, lastUsed: Date(), key: key)
+        return connection
+    }
+
+    /// Remove a connection from the pool
+    private func removeConnection(key: String) {
+        connectionPool.removeValue(forKey: key)
+    }
+
+    /// Evict idle connections that haven't been used recently
+    func evictIdleConnections() {
+        let cutoff = Date().addingTimeInterval(-connectionIdleTimeout)
+        for (key, pooled) in connectionPool where pooled.lastUsed < cutoff {
+            pooled.connection.cancel()
+            connectionPool.removeValue(forKey: key)
+        }
+    }
+
+    /// Close all pooled connections (call when the app goes to background)
+    func closeAllConnections() {
+        for (_, pooled) in connectionPool {
+            pooled.connection.cancel()
+        }
+        connectionPool.removeAll()
+    }
+
+    // MARK: - Connection Management
+
+    /// Send a command and receive the response.
+    ///
+    /// Reuses a persistent TCP connection when available, falling back to a fresh
+    /// connection if the pooled one has gone stale.
+    private func sendCommand(
+        ipAddress: String,
+        port: Int = PhotonPrinterService.defaultPort,
+        command: String
+    ) async throws -> [String] {
+        AppLogger.network.debug("ACT send \(command) → \(ipAddress):\(port)")
+
+        do {
+            let connection = try await getConnection(ipAddress: ipAddress, port: port)
+            return try await sendOnConnection(connection, command: command, ipAddress: ipAddress, port: port)
+        } catch {
+            // If the pooled connection failed, evict it and retry once with a fresh connection
+            let key = "\(ipAddress):\(port)"
+            if let pooled = connectionPool[key] {
+                pooled.connection.cancel()
+                connectionPool.removeValue(forKey: key)
+            }
+
+            AppLogger.network.debug("ACT retrying \(command) with fresh connection to \(ipAddress):\(port)")
+            let connection = try await getConnection(ipAddress: ipAddress, port: port)
+            return try await sendOnConnection(connection, command: command, ipAddress: ipAddress, port: port)
+        }
+    }
+
+    /// Send a command over an established connection and read the response
+    private func sendOnConnection(
+        _ connection: NWConnection,
+        command: String,
+        ipAddress: String,
+        port: Int
+    ) async throws -> [String] {
+        return try await withCheckedThrowingContinuation { continuation in
+            let resumeGuard = SendOnce()
+
             let commandData = Data((command + "\r\n").utf8)
             connection.send(
                 content: commandData,
                 completion: .contentProcessed { error in
                     if let error {
                         if resumeGuard.tryAcquire() {
-                            connection.cancel()
                             continuation.resume(
                                 throwing: PhotonError.connectionFailed(error.localizedDescription))
                         }
@@ -176,7 +276,6 @@ actor PhotonPrinterService {
                     // Receive response
                     self.receiveResponse(connection: connection) { result in
                         if resumeGuard.tryAcquire() {
-                            connection.cancel()
                             continuation.resume(with: result)
                         }
                     }
@@ -185,7 +284,6 @@ actor PhotonPrinterService {
             // Timeout
             DispatchQueue.global().asyncAfter(deadline: .now() + self.commandTimeout) {
                 if resumeGuard.tryAcquire() {
-                    connection.cancel()
                     continuation.resume(throwing: PhotonError.timeout)
                 }
             }

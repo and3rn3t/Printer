@@ -31,6 +31,14 @@ actor BackgroundPrintMonitor {
     /// Tracks which milestones have already been notified per printer
     private var notifiedMilestones: [String: Set<Int>] = [:]
 
+    /// Shared model container — injected once to avoid re-creation on every poll
+    private var modelContainer: ModelContainer?
+
+    /// Inject the shared ModelContainer (call once at app launch)
+    func configure(with container: ModelContainer) {
+        self.modelContainer = container
+    }
+
     // MARK: - Registration
 
     #if os(iOS)
@@ -83,14 +91,22 @@ actor BackgroundPrintMonitor {
 
     /// Poll all known printers and check for active prints. Returns true if any printer is actively printing.
     func pollAllPrinters() async -> Bool {
-        guard let container = try? ModelContainer(
-            for: Printer.self,
-            PrintJob.self,
-            PrintModel.self,
-            configurations: ModelConfiguration(isStoredInMemoryOnly: false)
-        ) else {
-            AppLogger.background.error("Failed to create ModelContainer for background polling")
-            return false
+        // Use the injected container, falling back to creating one only if needed
+        let container: ModelContainer
+        if let existing = modelContainer {
+            container = existing
+        } else {
+            guard let fallback = try? ModelContainer(
+                for: Printer.self,
+                PrintJob.self,
+                PrintModel.self,
+                configurations: ModelConfiguration(isStoredInMemoryOnly: false)
+            ) else {
+                AppLogger.background.error("Failed to create ModelContainer for background polling")
+                return false
+            }
+            container = fallback
+            self.modelContainer = fallback
         }
 
         let context = ModelContext(container)

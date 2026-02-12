@@ -5,9 +5,9 @@
 //  Created by Matt on 2/11/26.
 //
 
-import SwiftUI
-import SwiftData
 import Charts
+import SwiftData
+import SwiftUI
 
 /// Browsable list of all print jobs across all printers.
 ///
@@ -26,6 +26,12 @@ struct PrintHistoryView: View {
     @State private var showingExportShare = false
     @State private var errorMessage: String?
     @State private var showingError = false
+
+    // Cached chart data — recomputed on filter/range change, not per body evaluation
+    @State private var cachedActivityData: [DailyPrintData] = []
+    @State private var cachedDurationData: [DurationData] = []
+    @State private var cachedSuccessRate: Double = 0
+    @State private var cachedTotalPrintTime: String = "0m"
 
     // MARK: - Filter Types
 
@@ -122,60 +128,64 @@ struct PrintHistoryView: View {
         allJobs.filter { $0.startDate >= chartRange.startDate }
     }
 
-    /// Activity data grouped by date and status for the stacked bar chart
-    private var activityData: [DailyPrintData] {
+    /// Refresh all cached chart data and stats
+    private func refreshCachedChartData() {
+        let jobs = chartJobs
         let calendar = Calendar.current
         let component = chartRange.groupingComponent
 
-        let grouped = Dictionary(grouping: chartJobs) { job in
+        // Activity data
+        let grouped = Dictionary(grouping: jobs) { job in
             calendar.dateInterval(of: component, for: job.startDate)?.start ?? job.startDate
         }
-
-        var result: [DailyPrintData] = []
+        var activityResult: [DailyPrintData] = []
         for (date, jobs) in grouped {
             let completed = jobs.filter { $0.status == .completed }.count
             let failed = jobs.filter { $0.status == .failed || $0.status == .cancelled }.count
             let other = jobs.count - completed - failed
-
             if completed > 0 {
-                result.append(DailyPrintData(date: date, status: "Completed", count: completed, color: .green))
+                activityResult.append(
+                    DailyPrintData(date: date, status: "Completed", count: completed, color: .green)
+                )
             }
             if failed > 0 {
-                result.append(DailyPrintData(date: date, status: "Failed", count: failed, color: .red))
+                activityResult.append(
+                    DailyPrintData(date: date, status: "Failed", count: failed, color: .red))
             }
             if other > 0 {
-                result.append(DailyPrintData(date: date, status: "Other", count: other, color: .orange))
+                activityResult.append(
+                    DailyPrintData(date: date, status: "Other", count: other, color: .orange))
             }
         }
+        cachedActivityData = activityResult.sorted { $0.date < $1.date }
 
-        return result.sorted { $0.date < $1.date }
-    }
+        // Duration data
+        cachedDurationData = grouped.map { date, jobs in
+            DurationData(date: date, hours: jobs.reduce(0.0) { $0 + $1.effectiveDuration } / 3600.0)
+        }.sorted { $0.date < $1.date }
 
-    /// Print duration data grouped by date for the duration chart
-    private var durationData: [DurationData] {
-        let calendar = Calendar.current
-        let component = chartRange.groupingComponent
-
-        let grouped = Dictionary(grouping: chartJobs) { job in
-            calendar.dateInterval(of: component, for: job.startDate)?.start ?? job.startDate
-        }
-
-        return grouped.map { date, jobs in
-            let totalHours = jobs.reduce(0.0) { $0 + $1.effectiveDuration } / 3600.0
-            return DurationData(date: date, hours: totalHours)
-        }
-        .sorted { $0.date < $1.date }
-    }
-
-    /// Success rate as a percentage (0–100)
-    private var successRate: Double {
+        // Success rate
         let finished = allJobs.filter {
             $0.status == .completed || $0.status == .failed || $0.status == .cancelled
         }
-        guard !finished.isEmpty else { return 0 }
-        let completed = finished.filter { $0.status == .completed }.count
-        return Double(completed) / Double(finished.count) * 100
+        cachedSuccessRate =
+            finished.isEmpty
+            ? 0
+            : Double(finished.filter { $0.status == .completed }.count) / Double(finished.count)
+                * 100
+
+        // Total print time
+        cachedTotalPrintTime = formatDuration(allJobs.reduce(0.0) { $0 + $1.effectiveDuration })
     }
+
+    /// Activity data grouped by date and status for the stacked bar chart
+    private var activityData: [DailyPrintData] { cachedActivityData }
+
+    /// Print duration data grouped by date for the duration chart
+    private var durationData: [DurationData] { cachedDurationData }
+
+    /// Success rate as a percentage (0–100)
+    private var successRate: Double { cachedSuccessRate }
 
     // MARK: - Body
 
@@ -241,6 +251,8 @@ struct PrintHistoryView: View {
             }
         }
         .navigationTitle("Print History")
+        .task { refreshCachedChartData() }
+        .onChange(of: chartRange) { _, _ in refreshCachedChartData() }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Menu {
@@ -280,7 +292,7 @@ struct PrintHistoryView: View {
             }
         }
         .alert("Export Error", isPresented: $showingError) {
-            Button("OK", role: .cancel) { }
+            Button("OK", role: .cancel) {}
         } message: {
             Text(errorMessage ?? "Failed to create export file.")
         }
@@ -298,7 +310,9 @@ struct PrintHistoryView: View {
             let exporter = ExportService()
             let csv = await exporter.exportJobsToCSV(jobs: filteredJobs)
             let dateStr = Date().formatted(.dateTime.year().month().day())
-            if let url = await exporter.writeToTempFile(content: csv, fileName: "PrintHistory_\(dateStr).csv") {
+            if let url = await exporter.writeToTempFile(
+                content: csv, fileName: "PrintHistory_\(dateStr).csv")
+            {
                 await MainActor.run {
                     exportURL = url
                     showingExportShare = true
@@ -388,10 +402,7 @@ struct PrintHistoryView: View {
         .frame(maxWidth: .infinity)
     }
 
-    private var totalPrintTime: String {
-        let total = allJobs.reduce(0.0) { $0 + $1.effectiveDuration }
-        return formatDuration(total)
-    }
+    private var totalPrintTime: String { cachedTotalPrintTime }
 
     // MARK: - Charts
 
@@ -424,7 +435,7 @@ struct PrintHistoryView: View {
                         .chartForegroundStyleScale([
                             "Completed": Color.green,
                             "Failed": Color.red,
-                            "Other": Color.orange
+                            "Other": Color.orange,
                         ])
                         .chartLegend(position: .bottom, spacing: 12)
                         .chartYAxis {

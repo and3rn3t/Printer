@@ -14,6 +14,7 @@ import OSLog
 ///
 /// Uses `@Observable` so SwiftUI views react automatically to state changes.
 /// For ACT protocol printers (Photon), polls via TCP. For HTTP printers, polls via REST.
+@MainActor
 @Observable
 final class PrinterConnectionManager {
 
@@ -171,10 +172,8 @@ final class PrinterConnectionManager {
             failedPolls = 0
 
             // Update the printer model
-            await MainActor.run {
-                printer.isConnected = true
-                printer.lastConnected = Date()
-            }
+            printer.isConnected = true
+            printer.lastConnected = Date()
         } catch {
             failedPolls += 1
             successfulPolls = 0
@@ -185,9 +184,7 @@ final class PrinterConnectionManager {
 
             if failedPolls >= 3 {
                 connectionState = .error(error.localizedDescription)
-                await MainActor.run {
-                    printer.isConnected = false
-                }
+                printer.isConnected = false
             } else if failedPolls == 1 {
                 // First failure — show as connecting (retry)
                 connectionState = .connecting
@@ -216,66 +213,64 @@ final class PrinterConnectionManager {
             status = .unknown(printerStat.state.text)
         }
 
-        await MainActor.run {
-            self.photonStatus = status
-            self.printerStatus = printerStat
+        self.photonStatus = status
+        self.printerStatus = printerStat
 
-            // Detect print state transitions
-            self.detectPrintTransition(newStatus: status)
+        // Detect print state transitions
+        self.detectPrintTransition(newStatus: status)
 
-            // Calculate estimated progress from elapsed time vs sliced metadata
-            if status == .printing, let job = self.activeJob {
-                let elapsed = job.effectiveDuration
-                if let estimatedTotal = job.model?.slicedPrintTimeSeconds, estimatedTotal > 0 {
-                    let totalSeconds = Double(estimatedTotal)
-                    self.estimatedProgress = min(elapsed / totalSeconds, 0.99)
-                    self.estimatedTimeRemaining = max(Int(totalSeconds - elapsed), 0)
+        // Calculate estimated progress from elapsed time vs sliced metadata
+        if status == .printing, let job = self.activeJob {
+            let elapsed = job.effectiveDuration
+            if let estimatedTotal = job.model?.slicedPrintTimeSeconds, estimatedTotal > 0 {
+                let totalSeconds = Double(estimatedTotal)
+                self.estimatedProgress = min(elapsed / totalSeconds, 0.99)
+                self.estimatedTimeRemaining = max(Int(totalSeconds - elapsed), 0)
 
-                    // "Finishing soon" notification when < 10 minutes remain
-                    if let remaining = self.estimatedTimeRemaining,
-                       remaining > 0, remaining < 600,
-                       !self.finishingSoonNotified {
-                        self.finishingSoonNotified = true
-                        PrintNotificationManager.shared.notifyPrintFinishingSoon(
-                            fileName: job.fileName,
-                            printerName: job.printerName,
-                            estimatedTimeRemaining: TimeInterval(remaining)
-                        )
-                    }
-                } else if elapsed > 0 {
-                    // No metadata — show elapsed but no percentage
-                    self.estimatedProgress = nil
-                    self.estimatedTimeRemaining = nil
+                // "Finishing soon" notification when < 10 minutes remain
+                if let remaining = self.estimatedTimeRemaining,
+                   remaining > 0, remaining < 600,
+                   !self.finishingSoonNotified {
+                    self.finishingSoonNotified = true
+                    PrintNotificationManager.shared.notifyPrintFinishingSoon(
+                        fileName: job.fileName,
+                        printerName: job.printerName,
+                        estimatedTimeRemaining: TimeInterval(remaining)
+                    )
                 }
-            } else {
+            } else if elapsed > 0 {
+                // No metadata — show elapsed but no percentage
                 self.estimatedProgress = nil
                 self.estimatedTimeRemaining = nil
             }
+        } else {
+            self.estimatedProgress = nil
+            self.estimatedTimeRemaining = nil
+        }
 
-            // Update Live Activity with current progress (ACT printers have limited progress info)
-            #if os(iOS)
-            if status == .printing {
-                let elapsed = Int(self.activeJob?.effectiveDuration ?? 0)
-                let progress = self.estimatedProgress ?? 0.0
-                let remaining = self.estimatedTimeRemaining
-                Task { @MainActor in
-                    await PrintActivityManager.shared.updateActivity(
-                        progress: progress,
-                        status: "Printing",
-                        elapsedSeconds: elapsed,
-                        estimatedSecondsRemaining: remaining
-                    )
-                }
+        // Update Live Activity with current progress (ACT printers have limited progress info)
+        #if os(iOS)
+        if status == .printing {
+            let elapsed = Int(self.activeJob?.effectiveDuration ?? 0)
+            let progress = self.estimatedProgress ?? 0.0
+            let remaining = self.estimatedTimeRemaining
+            Task {
+                await PrintActivityManager.shared.updateActivity(
+                    progress: progress,
+                    status: "Printing",
+                    elapsedSeconds: elapsed,
+                    estimatedSecondsRemaining: remaining
+                )
             }
-            #endif
+        }
+        #endif
 
-            // Update printer model with firmware if we have sysinfo
-            if let sysInfo = self.systemInfo {
-                printer.firmwareVersion = sysInfo.firmwareVersion
-                printer.serialNumber = sysInfo.serialNumber
-                if printer.model.isEmpty {
-                    printer.model = sysInfo.modelName
-                }
+        // Update printer model with firmware if we have sysinfo
+        if let sysInfo = self.systemInfo {
+            printer.firmwareVersion = sysInfo.firmwareVersion
+            printer.serialNumber = sysInfo.serialNumber
+            if printer.model.isEmpty {
+                printer.model = sysInfo.modelName
             }
         }
     }
@@ -293,36 +288,34 @@ final class PrinterConnectionManager {
             apiKey: printer.apiKey
         )
 
-        await MainActor.run {
-            self.printerStatus = status
-            self.jobStatus = job
+        self.printerStatus = status
+        self.jobStatus = job
 
-            // Detect HTTP print state transitions
-            self.detectHTTPTransition(newState: status.state.text)
+        // Detect HTTP print state transitions
+        self.detectHTTPTransition(newState: status.state.text)
 
-            // Update file name on active job from HTTP job info
-            if let activeJob, let fileName = job?.job?.file?.name, activeJob.fileName == nil {
-                activeJob.fileName = fileName
-            }
-
-            // Update Live Activity for HTTP printers
-            #if os(iOS)
-            if status.state.flags.printing, let jobInfo = job {
-                let elapsed = Int(self.activeJob?.effectiveDuration ?? 0)
-                let completionPct = jobInfo.progress?.completion ?? 0
-                let progress = min(completionPct / 100.0, 1.0)
-                let remaining = jobInfo.progress?.printTimeLeft.flatMap { Int($0) }
-                Task { @MainActor in
-                    await PrintActivityManager.shared.updateActivity(
-                        progress: progress,
-                        status: "Printing",
-                        elapsedSeconds: elapsed,
-                        estimatedSecondsRemaining: remaining
-                    )
-                }
-            }
-            #endif
+        // Update file name on active job from HTTP job info
+        if let activeJob, let fileName = job?.job?.file?.name, activeJob.fileName == nil {
+            activeJob.fileName = fileName
         }
+
+        // Update Live Activity for HTTP printers
+        #if os(iOS)
+        if status.state.flags.printing, let jobInfo = job {
+            let elapsed = Int(self.activeJob?.effectiveDuration ?? 0)
+            let completionPct = jobInfo.progress?.completion ?? 0
+            let progress = min(completionPct / 100.0, 1.0)
+            let remaining = jobInfo.progress?.printTimeLeft.flatMap { Int($0) }
+            Task {
+                await PrintActivityManager.shared.updateActivity(
+                    progress: progress,
+                    status: "Printing",
+                    elapsedSeconds: elapsed,
+                    estimatedSecondsRemaining: remaining
+                )
+            }
+        }
+        #endif
     }
 
     /// Fetch system info once on connect (ACT only)
@@ -338,16 +331,14 @@ final class PrinterConnectionManager {
                 port: printer.port
             )
 
-            await MainActor.run {
-                self.systemInfo = sysInfo
-                self.wifiNetwork = wifi
+            self.systemInfo = sysInfo
+            self.wifiNetwork = wifi
 
-                // Populate printer model fields
-                printer.firmwareVersion = sysInfo.firmwareVersion
-                printer.serialNumber = sysInfo.serialNumber
-                if printer.model.isEmpty {
-                    printer.model = sysInfo.modelName
-                }
+            // Populate printer model fields
+            printer.firmwareVersion = sysInfo.firmwareVersion
+            printer.serialNumber = sysInfo.serialNumber
+            if printer.model.isEmpty {
+                printer.model = sysInfo.modelName
             }
         } catch {
             AppLogger.network.warning("Failed to fetch sysinfo for \(printer.name): \(error.localizedDescription)")
@@ -466,20 +457,16 @@ final class PrinterConnectionManager {
         activeJob = job
 
         if let modelContext {
-            Task { @MainActor in
-                modelContext.insert(job)
-            }
+            modelContext.insert(job)
         }
 
         // Start Live Activity
         #if os(iOS)
-        Task { @MainActor in
-            PrintActivityManager.shared.startActivity(
-                fileName: job.fileName ?? "Unknown",
-                printerName: printerName,
-                printerProtocol: proto.rawValue
-            )
-        }
+        PrintActivityManager.shared.startActivity(
+            fileName: job.fileName ?? "Unknown",
+            printerName: printerName,
+            printerProtocol: proto.rawValue
+        )
         #endif
 
         // Start time-lapse capture for OctoPrint printers with webcam
@@ -494,9 +481,7 @@ final class PrinterConnectionManager {
         let elapsed = Date().timeIntervalSince(start)
 
         if let job = activeJob {
-            Task { @MainActor in
-                job.elapsedTime += elapsed
-            }
+            job.elapsedTime += elapsed
         }
         printSessionStart = nil
     }
@@ -509,25 +494,21 @@ final class PrinterConnectionManager {
         if let start = printSessionStart {
             let elapsed = Date().timeIntervalSince(start)
             if let job = activeJob {
-                Task { @MainActor in
-                    job.elapsedTime += elapsed
-                    job.status = status
-                    job.endDate = Date()
-
-                    // Auto-deduct from inventory on successful completion
-                    if status == .completed {
-                        deductInventory(for: job)
-                    }
-                }
-            }
-        } else if let job = activeJob {
-            Task { @MainActor in
+                job.elapsedTime += elapsed
                 job.status = status
                 job.endDate = Date()
 
+                // Auto-deduct from inventory on successful completion
                 if status == .completed {
                     deductInventory(for: job)
                 }
+            }
+        } else if let job = activeJob {
+            job.status = status
+            job.endDate = Date()
+
+            if status == .completed {
+                deductInventory(for: job)
             }
         }
 
@@ -535,7 +516,7 @@ final class PrinterConnectionManager {
         #if os(iOS)
         let finalStatus = status == .completed ? "Completed" : (status == .cancelled ? "Cancelled" : "Failed")
         let finalProgress = status == .completed ? 1.0 : 0.0
-        Task { @MainActor in
+        Task {
             await PrintActivityManager.shared.endActivity(
                 finalStatus: finalStatus,
                 progress: finalProgress
@@ -581,7 +562,6 @@ final class PrinterConnectionManager {
     }
 
     /// Deduct material volume from the first matching inventory item after a successful print
-    @MainActor
     private func deductInventory(for job: PrintJob) {
         guard let volume = job.model?.slicedVolumeMl, volume > 0 else { return }
         guard let profile = job.resinProfile, let modelContext else { return }
@@ -607,7 +587,13 @@ final class PrinterConnectionManager {
         }
     }
 
+    nonisolated func cancelPolling() {
+        Task { @MainActor in
+            pollingTask?.cancel()
+        }
+    }
+
     deinit {
-        pollingTask?.cancel()
+        cancelPolling()
     }
 }

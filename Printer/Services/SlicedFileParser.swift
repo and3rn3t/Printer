@@ -85,6 +85,9 @@ enum SlicedFileParserError: LocalizedError {
 /// - **GCode** — FDM slicer output (text-based comment parsing)
 actor SlicedFileParser {
 
+    /// Shared singleton — this actor is stateless
+    static let shared = SlicedFileParser()
+
     // MARK: - Public API
 
     /// Parse metadata from a sliced file at the given URL

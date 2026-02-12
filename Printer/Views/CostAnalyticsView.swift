@@ -12,7 +12,7 @@ import Charts
 /// Aggregated cost analytics dashboard showing spend over time, per-printer and per-resin breakdowns,
 /// and budget-vs-actual tracking.
 struct CostAnalyticsView: View {
-    @Query(sort: \PrintJob.startDate, order: .reverse) private var allJobs: [PrintJob]
+    @Environment(\.modelContext) private var modelContext
     @Query private var printers: [Printer]
 
     @AppStorage("resinCostPerMl") private var resinCostPerMl: Double = 0.0
@@ -20,6 +20,18 @@ struct CostAnalyticsView: View {
     @AppStorage("monthlyBudget") private var monthlyBudget: Double = 0.0
 
     @State private var timeRange: TimeRange = .month
+
+    // Cached computed data — refreshed on timeRange change, not per body evaluation
+    @State private var cachedCompletedJobs: [PrintJob] = []
+    @State private var cachedJobsInRange: [PrintJob] = []
+    @State private var cachedTotalCostInRange: Double = 0
+    @State private var cachedTotalCostAllTime: Double = 0
+    @State private var cachedTotalVolumeInRange: Double = 0
+    @State private var cachedAverageCostPerJob: Double = 0
+    @State private var cachedCurrentMonthSpend: Double = 0
+    @State private var cachedDailySpend: [(date: Date, cost: Double)] = []
+    @State private var cachedPerPrinterSpend: [(name: String, cost: Double)] = []
+    @State private var cachedPerResinSpend: [(name: String, cost: Double)] = []
 
     enum TimeRange: String, CaseIterable {
         case week = "7 Days"
@@ -43,12 +55,47 @@ struct CostAnalyticsView: View {
 
     // MARK: - Computed Data
 
-    private var completedJobs: [PrintJob] {
-        allJobs.filter { $0.status == .completed }
-    }
+    private func refreshCachedData() {
+        let allJobs = (try? modelContext.fetch(FetchDescriptor<PrintJob>(sortBy: [SortDescriptor(\PrintJob.startDate, order: .reverse)]))) ?? []
 
-    private var jobsInRange: [PrintJob] {
-        completedJobs.filter { $0.startDate >= timeRange.startDate }
+        cachedCompletedJobs = allJobs.filter { $0.status == .completed }
+        cachedJobsInRange = cachedCompletedJobs.filter { $0.startDate >= timeRange.startDate }
+
+        cachedTotalCostInRange = cachedJobsInRange.reduce(0) { $0 + costForJob($1) }
+        cachedTotalCostAllTime = cachedCompletedJobs.reduce(0) { $0 + costForJob($1) }
+        cachedTotalVolumeInRange = cachedJobsInRange.reduce(0) { $0 + Double($1.model?.slicedVolumeMl ?? 0) }
+
+        let jobsWithCost = cachedJobsInRange.filter { costForJob($0) > 0 }
+        cachedAverageCostPerJob = jobsWithCost.isEmpty ? 0 : jobsWithCost.reduce(0) { $0 + costForJob($1) } / Double(jobsWithCost.count)
+
+        let cal = Calendar.current
+        let monthStart = cal.date(from: cal.dateComponents([.year, .month], from: Date())) ?? Date()
+        cachedCurrentMonthSpend = cachedCompletedJobs
+            .filter { $0.startDate >= monthStart }
+            .reduce(0) { $0 + costForJob($1) }
+
+        // Daily spend
+        var byDay: [Date: Double] = [:]
+        for job in cachedJobsInRange {
+            let day = cal.startOfDay(for: job.startDate)
+            byDay[day, default: 0] += costForJob(job)
+        }
+        cachedDailySpend = byDay.sorted { $0.key < $1.key }.map { (date: $0.key, cost: $0.value) }
+
+        // Per-printer spend
+        var byPrinter: [String: Double] = [:]
+        for job in cachedJobsInRange {
+            byPrinter[job.printerName, default: 0] += costForJob(job)
+        }
+        cachedPerPrinterSpend = byPrinter.sorted { $0.value > $1.value }.map { (name: $0.key, cost: $0.value) }
+
+        // Per-resin spend
+        var byResin: [String: Double] = [:]
+        for job in cachedJobsInRange {
+            let name = job.resinProfile?.name ?? "Unknown"
+            byResin[name, default: 0] += costForJob(job)
+        }
+        cachedPerResinSpend = byResin.sorted { $0.value > $1.value }.map { (name: $0.key, cost: $0.value) }
     }
 
     private func costForJob(_ job: PrintJob) -> Double {
@@ -60,67 +107,25 @@ struct CostAnalyticsView: View {
         return Double(volume) * costPerMl
     }
 
-    private var totalCostInRange: Double {
-        jobsInRange.reduce(0) { $0 + costForJob($1) }
-    }
+    private var totalCostInRange: Double { cachedTotalCostInRange }
 
-    private var totalCostAllTime: Double {
-        completedJobs.reduce(0) { $0 + costForJob($1) }
-    }
+    private var totalCostAllTime: Double { cachedTotalCostAllTime }
 
-    private var totalVolumeInRange: Double {
-        jobsInRange.reduce(0) { $0 + Double($1.model?.slicedVolumeMl ?? 0) }
-    }
+    private var totalVolumeInRange: Double { cachedTotalVolumeInRange }
 
-    private var averageCostPerJob: Double {
-        let jobsWithCost = jobsInRange.filter { costForJob($0) > 0 }
-        guard !jobsWithCost.isEmpty else { return 0 }
-        return jobsWithCost.reduce(0) { $0 + costForJob($1) } / Double(jobsWithCost.count)
-    }
+    private var averageCostPerJob: Double { cachedAverageCostPerJob }
 
     /// Current month's spend for budget tracking
-    private var currentMonthSpend: Double {
-        let cal = Calendar.current
-        let start = cal.date(
-            from: cal.dateComponents([.year, .month], from: Date())
-        ) ?? Date()
-        return completedJobs
-            .filter { $0.startDate >= start }
-            .reduce(0) { $0 + costForJob($1) }
-    }
+    private var currentMonthSpend: Double { cachedCurrentMonthSpend }
 
     /// Spend grouped by day for the chart
-    private var dailySpend: [(date: Date, cost: Double)] {
-        let cal = Calendar.current
-        var byDay: [Date: Double] = [:]
-
-        for job in jobsInRange {
-            let day = cal.startOfDay(for: job.startDate)
-            byDay[day, default: 0] += costForJob(job)
-        }
-
-        return byDay.sorted { $0.key < $1.key }.map { (date: $0.key, cost: $0.value) }
-    }
+    private var dailySpend: [(date: Date, cost: Double)] { cachedDailySpend }
 
     /// Spend grouped by printer
-    private var perPrinterSpend: [(name: String, cost: Double)] {
-        var byPrinter: [String: Double] = [:]
-        for job in jobsInRange {
-            let name = job.printerName
-            byPrinter[name, default: 0] += costForJob(job)
-        }
-        return byPrinter.sorted { $0.value > $1.value }.map { (name: $0.key, cost: $0.value) }
-    }
+    private var perPrinterSpend: [(name: String, cost: Double)] { cachedPerPrinterSpend }
 
     /// Spend grouped by resin profile
-    private var perResinSpend: [(name: String, cost: Double)] {
-        var byResin: [String: Double] = [:]
-        for job in jobsInRange {
-            let name = job.resinProfile?.name ?? "Unknown"
-            byResin[name, default: 0] += costForJob(job)
-        }
-        return byResin.sorted { $0.value > $1.value }.map { (name: $0.key, cost: $0.value) }
-    }
+    private var perResinSpend: [(name: String, cost: Double)] { cachedPerResinSpend }
 
     // MARK: - Body
 
@@ -167,6 +172,8 @@ struct CostAnalyticsView: View {
             .padding(.top)
         }
         .navigationTitle("Cost Analytics")
+        .task { refreshCachedData() }
+        .onChange(of: timeRange) { _, _ in refreshCachedData() }
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
@@ -346,7 +353,7 @@ struct CostAnalyticsView: View {
     // MARK: - Top Cost Jobs
 
     private var topCostJobs: some View {
-        let jobsWithCost = jobsInRange
+        let jobsWithCost = cachedJobsInRange
             .map { (job: $0, cost: costForJob($0)) }
             .filter { $0.cost > 0 }
             .sorted { $0.cost > $1.cost }

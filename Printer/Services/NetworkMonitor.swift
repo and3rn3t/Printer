@@ -16,6 +16,11 @@ import Observation
 @Observable
 final class NetworkMonitor {
 
+    // MARK: - Shared Instance
+
+    /// Shared singleton to avoid creating multiple NWPathMonitor instances
+    static let shared = NetworkMonitor()
+
     // MARK: - Properties
 
     /// Whether the device has any network connection

@@ -514,7 +514,7 @@ struct SettingsView: View {
         rescanProgress = 0
 
         Task {
-            let parser = SlicedFileParser()
+            let parser = SlicedFileParser.shared
             var metadataParsed = 0
             var thumbnailsExtracted = 0
 
@@ -579,7 +579,7 @@ struct SettingsView: View {
         dimensionAnalysisProgress = 0
 
         Task {
-            let analyzer = MeshAnalyzer()
+            let analyzer = MeshAnalyzer.shared
             var analyzed = 0
 
             for model in meshModels {

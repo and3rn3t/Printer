@@ -13,7 +13,6 @@ struct ModelDetailView: View {
     @Bindable var model: PrintModel
     let printers: [Printer]
     @Environment(\.modelContext) private var modelContext
-    @Query(sort: \PrintModel.name) private var allModels: [PrintModel]
 
     @AppStorage("showSlicingWarnings") private var showSlicingWarnings = true
     @AppStorage("confirmBeforeDelete") private var confirmBeforeDelete = true
@@ -27,9 +26,13 @@ struct ModelDetailView: View {
     @State private var show3DPreview = false
     @State private var showingCollectionPicker = false
 
-    /// All unique tags across the library for auto-suggest
-    private var allUniqueTags: [String] {
-        Array(Set(allModels.flatMap { $0.tags })).sorted()
+    /// All unique tags across the library — cached on appear, not recomputed per body
+    @State private var allUniqueTags: [String] = []
+
+    /// Load tags once from a targeted query instead of fetching all models
+    private func loadUniqueTags() {
+        let models = (try? modelContext.fetch(FetchDescriptor<PrintModel>())) ?? []
+        allUniqueTags = Array(Set(models.flatMap { $0.tags })).sorted()
     }
 
     /// Whether this model supports interactive 3D preview
@@ -299,7 +302,7 @@ struct ModelDetailView: View {
 
                         Button {
                             Task {
-                                let analyzer = MeshAnalyzer()
+                                let analyzer = MeshAnalyzer.shared
                                 if let info = try? await analyzer.analyze(url: model.resolvedFileURL) {
                                     model.applyMeshInfo(info)
                                 }
@@ -393,7 +396,7 @@ struct ModelDetailView: View {
 
                         Button {
                             Task {
-                                let parser = SlicedFileParser()
+                                let parser = SlicedFileParser.shared
                                 if let metadata = await parser.parseMetadata(from: model.resolvedFileURL) {
                                     model.applyMetadata(metadata)
                                 }
@@ -575,6 +578,7 @@ struct ModelDetailView: View {
 #if os(macOS)
         .navigationSubtitle("\(ByteCountFormatter.string(fromByteCount: model.fileSize, countStyle: .file))")
 #endif
+        .task { loadUniqueTags() }
         .sheet(isPresented: $showingPrintSheet) {
             PrintJobView(model: model, printers: printers)
         }

@@ -35,19 +35,24 @@ func importModelFile(url: URL, into context: ModelContext) async throws -> Print
     let (fileURL, fileSize) = try await STLFileManager.shared.importSTL(from: importURL)
     let relativePath = await STLFileManager.shared.relativePath(for: fileURL)
 
+    // Clean up temp conversion file
+    if importURL != url {
+        try? FileManager.default.removeItem(at: importURL)
+    }
+
     // Generate thumbnail
     var thumbnailData: Data?
     if fileType.needsSlicing && ["stl", "obj", "usdz"].contains(ext) {
         thumbnailData = try? await converter.generateThumbnail(from: fileURL)
     } else if fileType.isSliced {
-        let parser = SlicedFileParser()
+        let parser = SlicedFileParser.shared
         thumbnailData = await parser.extractThumbnail(from: fileURL)
     }
 
     // Extract sliced file metadata
     var slicedMetadata: SlicedFileMetadata?
     if fileType.isSliced {
-        let parser = SlicedFileParser()
+        let parser = SlicedFileParser.shared
         slicedMetadata = await parser.parseMetadata(from: fileURL)
     }
 
@@ -66,7 +71,7 @@ func importModelFile(url: URL, into context: ModelContext) async throws -> Print
 
     // Analyze mesh dimensions for mesh formats
     if fileType.needsSlicing {
-        let analyzer = MeshAnalyzer()
+        let analyzer = MeshAnalyzer.shared
         if let info = try? await analyzer.analyze(url: fileURL) {
             model.applyMeshInfo(info)
         }
@@ -83,18 +88,25 @@ struct ContentView: View {
     @Query private var printers: [Printer]
 
     @State private var selectedModel: PrintModel?
-    @State private var showingScanner = false
+    @State private var activeSheet: SheetDestination?
     @State private var showingImporter = false
-    @State private var showingPrintHistory = false
-    @State private var showingPrintables = false
-    @State private var showingPrintQueue = false
-    @State private var showingStatistics = false
-    @State private var showingCollections = false
-    @State private var showingTagBrowser = false
     @State private var columnVisibility = NavigationSplitViewVisibility.all
     @State private var selectedTab: AppTab = .dashboard
     @State private var errorMessage: String?
     @State private var showingError = false
+
+    /// Sheet destinations for the main content view
+    enum SheetDestination: Identifiable {
+        case scanner
+        case printables
+        case printHistory
+        case printQueue
+        case statistics
+        case collections
+        case tagBrowser
+
+        var id: Self { self }
+    }
 
     /// App-level tab identifiers for type-safe tab selection.
     enum AppTab: Hashable {
@@ -128,11 +140,42 @@ struct ContentView: View {
             }
         }
         .tabViewStyle(.sidebarAdaptable)
-        .sheet(isPresented: $showingScanner) {
-            ObjectScannerView { url in
-                Task {
-                    await handleScannedModel(url: url)
+        .sheet(item: $activeSheet) { destination in
+            switch destination {
+            case .scanner:
+                ObjectScannerView { url in
+                    Task {
+                        await handleScannedModel(url: url)
+                    }
                 }
+            case .printables:
+                PrintablesBrowseView()
+            case .printHistory:
+                NavigationStack {
+                    PrintHistoryView()
+                        .toolbar {
+                            ToolbarItem(placement: .cancellationAction) {
+                                Button("Done") {
+                                    activeSheet = nil
+                                }
+                            }
+                        }
+                }
+            case .printQueue:
+                PrintQueueView()
+            case .statistics:
+                NavigationStack {
+                    StatisticsView()
+                        .toolbar {
+                            ToolbarItem(placement: .confirmationAction) {
+                                Button("Done") { activeSheet = nil }
+                            }
+                        }
+                }
+            case .collections:
+                CollectionListView()
+            case .tagBrowser:
+                TagBrowserView()
             }
         }
         .fileImporter(
@@ -143,40 +186,6 @@ struct ContentView: View {
             Task {
                 await handleImportedFiles(result: result)
             }
-        }
-        .sheet(isPresented: $showingPrintables) {
-            PrintablesBrowseView()
-        }
-        .sheet(isPresented: $showingPrintHistory) {
-            NavigationStack {
-                PrintHistoryView()
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button("Done") {
-                                showingPrintHistory = false
-                            }
-                        }
-                    }
-            }
-        }
-        .sheet(isPresented: $showingPrintQueue) {
-            PrintQueueView()
-        }
-        .sheet(isPresented: $showingStatistics) {
-            NavigationStack {
-                StatisticsView()
-                    .toolbar {
-                        ToolbarItem(placement: .confirmationAction) {
-                            Button("Done") { showingStatistics = false }
-                        }
-                    }
-            }
-        }
-        .sheet(isPresented: $showingCollections) {
-            CollectionListView()
-        }
-        .sheet(isPresented: $showingTagBrowser) {
-            TagBrowserView()
         }
         .alert("Error", isPresented: $showingError) {
             Button("OK", role: .cancel) {}
@@ -194,14 +203,14 @@ struct ContentView: View {
                 models: models,
                 selectedModel: $selectedModel,
                 actions: .init(
-                    showScanner: { showingScanner = true },
+                    showScanner: { activeSheet = .scanner },
                     showImporter: { showingImporter = true },
-                    showPrintables: { showingPrintables = true },
-                    showPrintHistory: { showingPrintHistory = true },
-                    showPrintQueue: { showingPrintQueue = true },
-                    showStatistics: { showingStatistics = true },
-                    showCollections: { showingCollections = true },
-                    showTagBrowser: { showingTagBrowser = true },
+                    showPrintables: { activeSheet = .printables },
+                    showPrintHistory: { activeSheet = .printHistory },
+                    showPrintQueue: { activeSheet = .printQueue },
+                    showStatistics: { activeSheet = .statistics },
+                    showCollections: { activeSheet = .collections },
+                    showTagBrowser: { activeSheet = .tagBrowser },
                     onDelete: deleteModels
                 )
             )
@@ -226,7 +235,7 @@ struct ContentView: View {
 
                     HStack(spacing: 16) {
                         Button {
-                            showingScanner = true
+                            activeSheet = .scanner
                         } label: {
                             VStack(spacing: 8) {
                                 Image(systemName: "camera.fill")
@@ -285,7 +294,7 @@ struct ContentView: View {
     private func handleScannedModel(url: URL) async {
         do {
             // Convert if needed (USDZ to STL)
-            let converter = ModelConverter()
+            let converter = ModelConverter.shared
             let stlURL: URL
 
             if url.pathExtension.lowercased() == "usdz" {
@@ -296,6 +305,11 @@ struct ContentView: View {
 
             // Import the file
             let (fileURL, fileSize) = try await STLFileManager.shared.importSTL(from: stlURL)
+
+            // Clean up temp conversion file
+            if stlURL != url {
+                try? FileManager.default.removeItem(at: stlURL)
+            }
 
             // Generate thumbnail
             let thumbnailData = try? await converter.generateThumbnail(from: fileURL)
@@ -377,15 +391,17 @@ struct ModelListView: View {
     @State private var showingBatchTag = false
     @State private var showingBatchCollectionPicker = false
 
+    /// Cached filtered and sorted models — recomputed on input change, not per body evaluation
+    @State private var cachedFilteredModels: [PrintModel] = []
+
     private var sortOption: ModelSortOption {
         ModelSortOption(rawValue: sortOptionRaw) ?? .dateNewest
     }
 
-    /// Models filtered and sorted by current user selections
-    private var filteredModels: [PrintModel] {
+    /// Recompute filtered/sorted models from current inputs
+    private func recomputeFilteredModels() {
         var result = models
 
-        // Filter
         switch filterOption {
         case .all: break
         case .scanned: result = result.filter { $0.source == .scanned }
@@ -396,7 +412,6 @@ struct ModelListView: View {
         case .sliced: result = result.filter { !$0.requiresSlicing }
         }
 
-        // Search
         if !searchText.isEmpty {
             let query = searchText.lowercased()
             result = result.filter {
@@ -405,7 +420,6 @@ struct ModelListView: View {
             }
         }
 
-        // Sort
         switch sortOption {
         case .dateNewest: result.sort { $0.modifiedDate > $1.modifiedDate }
         case .dateOldest: result.sort { $0.modifiedDate < $1.modifiedDate }
@@ -418,8 +432,11 @@ struct ModelListView: View {
         case .printCount: result.sort { $0.printJobs.count > $1.printJobs.count }
         }
 
-        return result
+        cachedFilteredModels = result
     }
+
+    /// Models filtered and sorted by current user selections
+    private var filteredModels: [PrintModel] { cachedFilteredModels }
 
     var body: some View {
         Group {
@@ -584,6 +601,11 @@ struct ModelListView: View {
         .sheet(isPresented: $showingBatchCollectionPicker) {
             BatchAddToCollectionView(modelIDs: selectedModelIDs, allModels: models)
         }
+        .task { recomputeFilteredModels() }
+        .onChange(of: searchText) { _, _ in recomputeFilteredModels() }
+        .onChange(of: filterOption) { _, _ in recomputeFilteredModels() }
+        .onChange(of: sortOptionRaw) { _, _ in recomputeFilteredModels() }
+        .onChange(of: models.count) { _, _ in recomputeFilteredModels() }
     }
 
     // MARK: - Toolbar
@@ -878,23 +900,27 @@ struct BatchAddToCollectionView: View {
 struct ModelRowView: View {
     let model: PrintModel
 
+    /// Decoded thumbnail image — cached in @State to avoid re-decoding on every render
+    #if os(macOS)
+        @State private var thumbnailImage: NSImage?
+    #else
+        @State private var thumbnailImage: UIImage?
+    #endif
+    @State private var thumbnailLoaded = false
+
     var body: some View {
         HStack(spacing: 12) {
             // Thumbnail with gradient placeholder
             Group {
-                if let thumbnailData = model.thumbnailData {
+                if let thumbnailImage {
                     #if os(macOS)
-                        if let nsImage = NSImage(data: thumbnailData) {
-                            Image(nsImage: nsImage)
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
-                        }
+                        Image(nsImage: thumbnailImage)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
                     #else
-                        if let uiImage = UIImage(data: thumbnailData) {
-                            Image(uiImage: uiImage)
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
-                        }
+                        Image(uiImage: thumbnailImage)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
                     #endif
                 } else {
                     ZStack {
@@ -982,6 +1008,17 @@ struct ModelRowView: View {
             Spacer()
         }
         .padding(.vertical, 8)
+        .task(id: model.thumbnailData?.hashValue) {
+            guard !thumbnailLoaded else { return }
+            thumbnailLoaded = true
+            if let data = model.thumbnailData {
+                #if os(macOS)
+                    thumbnailImage = NSImage(data: data)
+                #else
+                    thumbnailImage = UIImage(data: data)
+                #endif
+            }
+        }
     }
 
 }

@@ -12,13 +12,20 @@ import SwiftUI
 /// Single-glance dashboard showing all printers' live status, active prints, and recent activity.
 struct DashboardView: View {
     @Query private var printers: [Printer]
-    @Query(sort: \PrintJob.startDate, order: .reverse) private var allJobs: [PrintJob]
-    @Query(sort: \PrintModel.modifiedDate, order: .reverse) private var models: [PrintModel]
+    @Environment(\.modelContext) private var modelContext
 
     @State private var printerStates: [UUID: PrinterLiveState] = [:]
-    @State private var refreshTimer: Timer?
     @State private var errorMessage: String?
     @State private var showingError = false
+    @State private var refreshTask: Task<Void, Never>?
+
+    // Cached stats — computed once per refresh, not per body evaluation
+    @State private var cachedRecentJobs: [PrintJob] = []
+    @State private var cachedModelCount: Int = 0
+    @State private var cachedJobCount: Int = 0
+    @State private var cachedSuccessRate: String = "—"
+    @State private var cachedTotalSpendThisMonth: Double = 0
+    @State private var cachedMaintenanceAlerts: [MaintenanceScheduler.MaintenanceAlert] = []
 
     /// Live state for a printer card
     struct PrinterLiveState {
@@ -32,16 +39,7 @@ struct DashboardView: View {
         var estimatedCompletionDate: Date?
     }
 
-    /// Recent completed/failed/cancelled jobs (last 5)
-    private var recentJobs: [PrintJob] {
-        allJobs
-            .lazy
-            .filter { $0.status == .completed || $0.status == .failed || $0.status == .cancelled }
-            .prefix(5)
-            .map { $0 }
-    }
-
-    /// Printers currently printing
+    /// Printers currently printing (derived from live state, lightweight)
     private var activePrinters: [Printer] {
         printers.filter { printer in
             if let state = printerStates[printer.id] {
@@ -56,9 +54,50 @@ struct DashboardView: View {
         }
     }
 
-    /// Maintenance alerts across all printers
-    private var maintenanceAlerts: [MaintenanceScheduler.MaintenanceAlert] {
-        MaintenanceScheduler.computeAlerts(printers: printers)
+    /// Refresh cached stats from SwiftData using targeted queries
+    private func refreshCachedStats() {
+        do {
+            // Recent jobs — fetch only terminal statuses with limit
+            var recentDescriptor = FetchDescriptor<PrintJob>(
+                sortBy: [SortDescriptor(\PrintJob.startDate, order: .reverse)]
+            )
+            recentDescriptor.fetchLimit = 20
+            let recentCandidates = try modelContext.fetch(recentDescriptor)
+            cachedRecentJobs = Array(
+                recentCandidates
+                    .filter { $0.status == .completed || $0.status == .failed || $0.status == .cancelled }
+                    .prefix(5)
+            )
+
+            // Counts
+            cachedModelCount = (try? modelContext.fetchCount(FetchDescriptor<PrintModel>())) ?? 0
+            cachedJobCount = (try? modelContext.fetchCount(FetchDescriptor<PrintJob>())) ?? 0
+
+            // Success rate
+            let allJobs = try modelContext.fetch(FetchDescriptor<PrintJob>())
+            let completed = allJobs.filter { $0.status == .completed }.count
+            let total = allJobs.filter { $0.status == .completed || $0.status == .failed }.count
+            cachedSuccessRate = total > 0 ? "\(Int(Double(completed) / Double(total) * 100))%" : "—"
+
+            // Monthly spend
+            let cal = Calendar.current
+            let monthStart = cal.date(from: cal.dateComponents([.year, .month], from: Date())) ?? Date()
+            let resinCost = resinCostPerMl
+            if resinCost > 0 {
+                cachedTotalSpendThisMonth = allJobs
+                    .filter { $0.status == .completed && $0.startDate >= monthStart }
+                    .reduce(0) { sum, job in
+                        sum + Double(job.model?.slicedVolumeMl ?? 0) * resinCost
+                    }
+            } else {
+                cachedTotalSpendThisMonth = 0
+            }
+
+            // Maintenance
+            cachedMaintenanceAlerts = MaintenanceScheduler.computeAlerts(printers: printers)
+        } catch {
+            AppLogger.data.warning("Failed to refresh dashboard stats: \(error.localizedDescription)")
+        }
     }
 
     var body: some View {
@@ -108,7 +147,7 @@ struct DashboardView: View {
                 }
 
                 // Maintenance alerts
-                if !maintenanceAlerts.isEmpty {
+                if !cachedMaintenanceAlerts.isEmpty {
                     VStack(alignment: .leading, spacing: 8) {
                         Label("Maintenance Due", systemImage: "exclamationmark.triangle.fill")
                             .font(.headline)
@@ -116,7 +155,7 @@ struct DashboardView: View {
                             .padding(.horizontal)
 
                         VStack(spacing: 6) {
-                            ForEach(maintenanceAlerts.prefix(3)) { alert in
+                            ForEach(cachedMaintenanceAlerts.prefix(3)) { alert in
                                 HStack(spacing: 10) {
                                     Image(systemName: alert.type.icon)
                                         .foregroundStyle(alert.isOverdue ? .red : .orange)
@@ -155,19 +194,19 @@ struct DashboardView: View {
                     HStack(spacing: 12) {
                         quickStatCard(
                             title: "Models",
-                            value: "\(models.count)",
+                            value: "\(cachedModelCount)",
                             icon: "cube.transparent",
                             color: .blue
                         )
                         quickStatCard(
                             title: "Print Jobs",
-                            value: "\(allJobs.count)",
+                            value: "\(cachedJobCount)",
                             icon: "printer.fill",
                             color: .green
                         )
                         quickStatCard(
                             title: "Success Rate",
-                            value: successRate,
+                            value: cachedSuccessRate,
                             icon: "checkmark.seal.fill",
                             color: .purple
                         )
@@ -175,7 +214,7 @@ struct DashboardView: View {
                     .padding(.horizontal)
 
                     // Cost summary card
-                    if totalSpendThisMonth > 0 || monthlyBudget > 0 {
+                    if cachedTotalSpendThisMonth > 0 || monthlyBudget > 0 {
                         NavigationLink {
                             CostAnalyticsView()
                         } label: {
@@ -187,14 +226,14 @@ struct DashboardView: View {
                 }
 
                 // Recent activity
-                if !recentJobs.isEmpty {
+                if !cachedRecentJobs.isEmpty {
                     VStack(alignment: .leading, spacing: 12) {
                         Label("Recent Activity", systemImage: "clock.arrow.circlepath")
                             .font(.headline)
                             .padding(.horizontal)
 
                         VStack(spacing: 8) {
-                            ForEach(recentJobs) { job in
+                            ForEach(cachedRecentJobs) { job in
                                 recentJobRow(job: job)
                             }
                         }
@@ -207,9 +246,18 @@ struct DashboardView: View {
             .padding(.top)
         }
         .navigationTitle("Dashboard")
-        .onAppear { refreshAllPrinters() }
-        .onDisappear { refreshTimer?.invalidate() }
-        .refreshable { refreshAllPrinters() }
+        .task {
+            refreshCachedStats()
+            refreshAllPrinters()
+        }
+        .onDisappear {
+            refreshTask?.cancel()
+            refreshTask = nil
+        }
+        .refreshable {
+            refreshCachedStats()
+            refreshAllPrinters()
+        }
         .alert("Error", isPresented: $showingError) {
             Button("OK", role: .cancel) {}
         } message: {
@@ -423,16 +471,7 @@ struct DashboardView: View {
     @AppStorage("monthlyBudget") private var monthlyBudget: Double = 0.0
 
     private var totalSpendThisMonth: Double {
-        let cal = Calendar.current
-        let start = cal.date(from: cal.dateComponents([.year, .month], from: Date())) ?? Date()
-        guard resinCostPerMl > 0 else { return 0 }
-        return
-            allJobs
-            .filter { $0.status == .completed && $0.startDate >= start }
-            .reduce(0) { sum, job in
-                let vol = Double(job.model?.slicedVolumeMl ?? 0)
-                return sum + vol * resinCostPerMl
-            }
+        cachedTotalSpendThisMonth
     }
 
     private var costCurrencySymbol: String {
@@ -475,64 +514,61 @@ struct DashboardView: View {
     }
 
     private var successRate: String {
-        let completed = allJobs.filter { $0.status == .completed }.count
-        let total = allJobs.filter { $0.status == .completed || $0.status == .failed }.count
-        guard total > 0 else { return "—" }
-        return "\(Int(Double(completed) / Double(total) * 100))%"
+        cachedSuccessRate
     }
 
     private func refreshAllPrinters() {
-        for printer in printers {
-            Task {
-                if printer.printerProtocol == .act {
-                    let service = PhotonPrinterService.shared
-                    if let status = try? await service.getStatus(
-                        ipAddress: printer.ipAddress,
-                        port: printer.port
-                    ) {
-                        await MainActor.run {
-                            var state = printerStates[printer.id] ?? PrinterLiveState()
-                            state.isReachable = true
-                            state.photonStatus = status
-                            printerStates[printer.id] = state
-                        }
-                    } else {
-                        AppLogger.network.debug(
-                            "Dashboard: ACT status check failed for \(printer.name)")
-                        await MainActor.run {
-                            var state = printerStates[printer.id] ?? PrinterLiveState()
-                            state.isReachable = false
-                            state.photonStatus = nil
-                            printerStates[printer.id] = state
-                        }
+        refreshTask?.cancel()
+        refreshTask = Task {
+            await withTaskGroup(of: Void.self) { group in
+                for printer in printers {
+                    group.addTask { @MainActor in
+                        await self.refreshSinglePrinter(printer)
                     }
-                } else {
-                    let api = AnycubicPrinterAPI.shared
-                    let reachable = await api.isReachable(ipAddress: printer.ipAddress)
-                    await MainActor.run {
-                        var state = printerStates[printer.id] ?? PrinterLiveState()
-                        state.isReachable = reachable
-                        printerStates[printer.id] = state
-                    }
+                }
+            }
+        }
+    }
 
-                    if reachable {
-                        if let job = try? await api.getJobStatus(
-                            ipAddress: printer.ipAddress,
-                            apiKey: printer.apiKey ?? ""
-                        ) {
-                            await MainActor.run {
-                                var state = printerStates[printer.id] ?? PrinterLiveState()
-                                state.fileName = job.job?.file?.name
-                                state.progress = job.progress?.completion.map { $0 / 100.0 }
-                                if let remaining = job.progress?.printTimeLeft, remaining > 0 {
-                                    state.estimatedTimeRemaining = remaining
-                                    state.estimatedCompletionDate = Date().addingTimeInterval(
-                                        remaining)
-                                }
-                                printerStates[printer.id] = state
-                            }
-                        }
+    private func refreshSinglePrinter(_ printer: Printer) async {
+        if printer.printerProtocol == .act {
+            let service = PhotonPrinterService.shared
+            if let status = try? await service.getStatus(
+                ipAddress: printer.ipAddress,
+                port: printer.port
+            ) {
+                var state = printerStates[printer.id] ?? PrinterLiveState()
+                state.isReachable = true
+                state.photonStatus = status
+                printerStates[printer.id] = state
+            } else {
+                AppLogger.network.debug(
+                    "Dashboard: ACT status check failed for \(printer.name)")
+                var state = printerStates[printer.id] ?? PrinterLiveState()
+                state.isReachable = false
+                state.photonStatus = nil
+                printerStates[printer.id] = state
+            }
+        } else {
+            let api = AnycubicPrinterAPI.shared
+            let reachable = await api.isReachable(ipAddress: printer.ipAddress, knownProtocol: printer.printerProtocol)
+            var state = printerStates[printer.id] ?? PrinterLiveState()
+            state.isReachable = reachable
+            printerStates[printer.id] = state
+
+            if reachable {
+                if let job = try? await api.getJobStatus(
+                    ipAddress: printer.ipAddress,
+                    apiKey: printer.apiKey ?? ""
+                ) {
+                    var state = printerStates[printer.id] ?? PrinterLiveState()
+                    state.fileName = job.job?.file?.name
+                    state.progress = job.progress?.completion.map { $0 / 100.0 }
+                    if let remaining = job.progress?.printTimeLeft, remaining > 0 {
+                        state.estimatedTimeRemaining = remaining
+                        state.estimatedCompletionDate = Date().addingTimeInterval(remaining)
                     }
+                    printerStates[printer.id] = state
                 }
             }
         }

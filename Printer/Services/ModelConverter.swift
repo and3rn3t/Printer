@@ -14,6 +14,9 @@ import OSLog
 /// Converts between different 3D model formats
 actor ModelConverter {
 
+    /// Shared singleton — this actor is stateless
+    static let shared = ModelConverter()
+
     enum ConversionError: LocalizedError {
         case unsupportedFormat
         case conversionFailed

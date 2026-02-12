@@ -673,8 +673,39 @@ actor AnycubicPrinterAPI {
         }
     }
 
-    /// Check if printer is reachable (lightweight ping)
-    func isReachable(ipAddress: String) async -> Bool {
+    /// Check if printer is reachable (lightweight ping).
+    /// When a known protocol is provided, probes only that protocol first for speed.
+    func isReachable(ipAddress: String, knownProtocol: PrinterProtocol? = nil) async -> Bool {
+        // If we know the protocol, try that first to avoid unnecessary timeouts
+        if let proto = knownProtocol {
+            switch proto {
+            case .act:
+                return await PhotonPrinterService.probe(ipAddress: ipAddress)
+            case .octoprint:
+                if let url = URL(string: "http://\(ipAddress)/api/version") {
+                    var request = URLRequest(url: url)
+                    request.timeoutInterval = 5
+                    request.httpMethod = "HEAD"
+                    if let (_, response) = try? await urlSession.data(for: request),
+                       (response as? HTTPURLResponse)?.statusCode == 200 {
+                        return true
+                    }
+                }
+                return false
+            case .anycubicHTTP:
+                if let url = URL(string: "http://\(ipAddress):18910/info") {
+                    var request = URLRequest(url: url)
+                    request.timeoutInterval = 3
+                    if let (_, response) = try? await urlSession.data(for: request),
+                       (response as? HTTPURLResponse)?.statusCode == 200 {
+                        return true
+                    }
+                }
+                return false
+            }
+        }
+
+        // Unknown protocol — try all in order
         // Try ACT protocol first (fastest for Photon printers)
         if await PhotonPrinterService.probe(ipAddress: ipAddress) {
             return true
