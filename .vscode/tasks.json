@@ -4,7 +4,7 @@
         {
             "label": "Build (xcodebuild)",
             "type": "shell",
-            "command": "xcodebuild -project Printer.xcodeproj -scheme Printer build 2>&1 | xcbeautify --disable-colored-output",
+            "command": "xcodebuild -project Printer.xcodeproj -scheme Printer -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' -configuration Debug build CODE_SIGN_IDENTITY='' CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO 2>&1 | xcbeautify --disable-colored-output",
             "group": {
                 "kind": "build",
                 "isDefault": true
@@ -19,7 +19,7 @@
         {
             "label": "Clean Build (xcodebuild)",
             "type": "shell",
-            "command": "xcodebuild -project Printer.xcodeproj -scheme Printer clean build 2>&1 | xcbeautify --disable-colored-output",
+            "command": "xcodebuild -project Printer.xcodeproj -scheme Printer -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' -configuration Debug clean build CODE_SIGN_IDENTITY='' CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO 2>&1 | xcbeautify --disable-colored-output",
             "problemMatcher": ["$xcodebuild"],
             "presentation": {
                 "reveal": "always",
@@ -30,7 +30,7 @@
         {
             "label": "Run Tests (xcodebuild)",
             "type": "shell",
-            "command": "xcodebuild -project Printer.xcodeproj -scheme Printer test -destination 'platform=iOS Simulator,name=iPhone 16' 2>&1 | xcbeautify --disable-colored-output",
+            "command": "xcodebuild -project Printer.xcodeproj -scheme Printer test -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' -configuration Debug -enableCodeCoverage YES -resultBundlePath TestResults.xcresult CODE_SIGN_IDENTITY='' CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO 2>&1 | xcbeautify --disable-colored-output",
             "group": {
                 "kind": "test",
                 "isDefault": true
@@ -45,7 +45,7 @@
         {
             "label": "Build for Testing",
             "type": "shell",
-            "command": "xcodebuild -project Printer.xcodeproj -scheme Printer build-for-testing -destination 'platform=iOS Simulator,name=iPhone 16' 2>&1 | xcbeautify --disable-colored-output",
+            "command": "xcodebuild -project Printer.xcodeproj -scheme Printer build-for-testing -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' -configuration Debug CODE_SIGN_IDENTITY='' CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO 2>&1 | xcbeautify --disable-colored-output",
             "problemMatcher": ["$xcodebuild"],
             "presentation": {
                 "reveal": "always",
@@ -56,7 +56,7 @@
         {
             "label": "Lint (SwiftLint)",
             "type": "shell",
-            "command": "swiftlint lint --config .swiftlint.yml --reporter emoji",
+            "command": "swiftlint lint --strict --config .swiftlint.yml --reporter emoji",
             "problemMatcher": {
                 "owner": "swiftlint",
                 "fileLocation": "absolute",
@@ -143,6 +143,17 @@
                 "panel": "dedicated",
                 "showReuseMessage": true,
                 "clear": false
+            }
+        },
+        {
+            "label": "Build Widget (xcodebuild)",
+            "type": "shell",
+            "command": "xcodebuild -project Printer.xcodeproj -scheme widgetExtension -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' -configuration Debug build CODE_SIGN_IDENTITY='' CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO 2>&1 | xcbeautify --disable-colored-output",
+            "problemMatcher": ["$xcodebuild"],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "clear": true
             }
         },
         {
