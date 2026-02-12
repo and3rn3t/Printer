@@ -151,7 +151,7 @@ actor SlicedFileParser {
         }
 
         // Parse FileMark offsets
-        let version = fileMarkData.readUInt32(at: 12)
+        _ = fileMarkData.readUInt32(at: 12)  // version
         let headerAddress = fileMarkData.readUInt32(at: 20)
         let layerDefinitionAddress = fileMarkData.readUInt32(at: 36)
 
@@ -681,19 +681,21 @@ actor SlicedFileParser {
     /// Convert raw RGBA pixel buffer to PNG data using CoreGraphics
     private func createPNGFromRGBA(_ rgba: [UInt8], width: Int, height: Int) -> Data? {
         let bitsPerComponent = 8
-        let bitsPerPixel = 32
         let bytesPerRow = width * 4
         let colorSpace = CGColorSpaceCreateDeviceRGB()
 
-        guard let context = CGContext(
-            data: UnsafeMutableRawPointer(mutating: rgba),
-            width: width,
-            height: height,
-            bitsPerComponent: bitsPerComponent,
-            bytesPerRow: bytesPerRow,
-            space: colorSpace,
-            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-        ) else { return nil }
+        var mutableRGBA = rgba
+        guard let context = mutableRGBA.withUnsafeMutableBytes({ buffer -> CGContext? in
+            CGContext(
+                data: buffer.baseAddress,
+                width: width,
+                height: height,
+                bitsPerComponent: bitsPerComponent,
+                bytesPerRow: bytesPerRow,
+                space: colorSpace,
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+            )
+        }) else { return nil }
 
         guard let cgImage = context.makeImage() else { return nil }
 
@@ -713,7 +715,7 @@ actor SlicedFileParser {
 
 // MARK: - Data Extension for Binary Reading
 
-private extension Data {
+private nonisolated extension Data {
     /// Read a little-endian UInt32 at the given byte offset
     func readUInt32(at offset: Int) -> UInt32 {
         guard offset + 4 <= count else { return 0 }

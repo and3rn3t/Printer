@@ -56,7 +56,7 @@ actor PhotonPrinterService {
     }
 
     /// Printer status parsed from getstatus command
-    enum PhotonStatus: Sendable {
+    nonisolated enum PhotonStatus: Sendable {
         case idle
         case printing
         case paused
@@ -97,7 +97,7 @@ actor PhotonPrinterService {
     }
 
     /// System information parsed from sysinfo command
-    struct PhotonSystemInfo: Sendable {
+    nonisolated struct PhotonSystemInfo: Sendable {
         let modelName: String
         let firmwareVersion: String
         let serialNumber: String
@@ -131,19 +131,19 @@ actor PhotonPrinterService {
         )
 
         return try await withCheckedThrowingContinuation { continuation in
-            var hasResumed = false
+            // Thread-safe guard to ensure continuation is resumed exactly once
+            let resumeGuard = SendOnce()
 
             connection.stateUpdateHandler = { state in
                 switch state {
                 case .failed(let error):
-                    if !hasResumed {
-                        hasResumed = true
+                    if resumeGuard.tryAcquire() {
+                        connection.cancel()
                         continuation.resume(
                             throwing: PhotonError.connectionFailed(error.localizedDescription))
                     }
                 case .cancelled:
-                    if !hasResumed {
-                        hasResumed = true
+                    if resumeGuard.tryAcquire() {
                         continuation.resume(throwing: PhotonError.disconnected)
                     }
                 default:
@@ -159,8 +159,7 @@ actor PhotonPrinterService {
                 content: commandData,
                 completion: .contentProcessed { error in
                     if let error {
-                        if !hasResumed {
-                            hasResumed = true
+                        if resumeGuard.tryAcquire() {
                             connection.cancel()
                             continuation.resume(
                                 throwing: PhotonError.connectionFailed(error.localizedDescription))
@@ -170,8 +169,7 @@ actor PhotonPrinterService {
 
                     // Receive response
                     self.receiveResponse(connection: connection) { result in
-                        if !hasResumed {
-                            hasResumed = true
+                        if resumeGuard.tryAcquire() {
                             connection.cancel()
                             continuation.resume(with: result)
                         }
@@ -180,8 +178,7 @@ actor PhotonPrinterService {
 
             // Timeout
             DispatchQueue.global().asyncAfter(deadline: .now() + self.commandTimeout) {
-                if !hasResumed {
-                    hasResumed = true
+                if resumeGuard.tryAcquire() {
                     connection.cancel()
                     continuation.resume(throwing: PhotonError.timeout)
                 }
@@ -373,18 +370,25 @@ actor PhotonPrinterService {
         let status = try await getStatus(ipAddress: ipAddress, port: port)
         let sysInfo = try? await getSystemInfo(ipAddress: ipAddress, port: port)
 
+        let statusText = status.displayText
+        let isOperational = status.isOperational
+        let isPrinting = status == .printing
+        let isPaused = status == .paused
+        let isIdle = status == .idle
+        let modelName = sysInfo?.modelName
+
         return PrinterStatus(
             state: PrinterState(
-                text: status.displayText,
+                text: statusText,
                 flags: StateFlags(
-                    operational: status.isOperational,
-                    printing: status == .printing,
-                    paused: status == .paused,
-                    ready: status == .idle
+                    operational: isOperational,
+                    printing: isPrinting,
+                    paused: isPaused,
+                    ready: isIdle
                 )
             ),
             temperature: nil,  // Photon resin printers don't report temperatures via ACT
-            printerName: sysInfo?.modelName
+            printerName: modelName
         )
     }
 
@@ -399,19 +403,17 @@ actor PhotonPrinterService {
         )
 
         return await withCheckedContinuation { continuation in
-            var hasResumed = false
+            let resumeGuard = SendOnce()
 
             connection.stateUpdateHandler = { state in
                 switch state {
                 case .ready:
-                    if !hasResumed {
-                        hasResumed = true
+                    if resumeGuard.tryAcquire() {
                         connection.cancel()
                         continuation.resume(returning: true)
                     }
                 case .failed, .cancelled:
-                    if !hasResumed {
-                        hasResumed = true
+                    if resumeGuard.tryAcquire() {
                         connection.cancel()
                         continuation.resume(returning: false)
                     }
@@ -423,8 +425,7 @@ actor PhotonPrinterService {
             connection.start(queue: .global(qos: .utility))
 
             DispatchQueue.global().asyncAfter(deadline: .now() + 2) {
-                if !hasResumed {
-                    hasResumed = true
+                if resumeGuard.tryAcquire() {
                     connection.cancel()
                     continuation.resume(returning: false)
                 }
@@ -435,8 +436,8 @@ actor PhotonPrinterService {
 
 // MARK: - Equatable conformance for PhotonStatus
 
-extension PhotonPrinterService.PhotonStatus: Equatable {
-    static func == (lhs: Self, rhs: Self) -> Bool {
+nonisolated extension PhotonPrinterService.PhotonStatus: Equatable {
+    nonisolated static func == (lhs: Self, rhs: Self) -> Bool {
         switch (lhs, rhs) {
         case (.idle, .idle): return true
         case (.printing, .printing): return true
@@ -445,5 +446,28 @@ extension PhotonPrinterService.PhotonStatus: Equatable {
         case (.unknown(let a), .unknown(let b)): return a == b
         default: return false
         }
+    }
+}
+
+// MARK: - Thread-Safe Continuation Guard
+
+/// Ensures a checked continuation is resumed exactly once, even when
+/// multiple threads race to complete it (e.g. state handler vs. timeout).
+///
+/// Uses `OSAtomicCompareAndSwap` semantics via `os_unfair_lock` for minimal overhead.
+nonisolated final class SendOnce: @unchecked Sendable {
+    nonisolated(unsafe) private var _sent = false
+    private let lock = NSLock()
+
+    nonisolated init() {}
+
+    /// Attempt to acquire the single-use token.
+    /// Returns `true` exactly once; all subsequent calls return `false`.
+    nonisolated func tryAcquire() -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !_sent else { return false }
+        _sent = true
+        return true
     }
 }

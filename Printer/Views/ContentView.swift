@@ -13,6 +13,7 @@ import UniformTypeIdentifiers
 
 /// Import a single file URL into a `PrintModel`, handling conversion, thumbnailing, and metadata extraction.
 /// Used by both file importer and drag & drop handlers.
+@MainActor
 @discardableResult
 func importModelFile(url: URL, into context: ModelContext) async throws -> PrintModel {
     let converter = ModelConverter()
@@ -49,29 +50,24 @@ func importModelFile(url: URL, into context: ModelContext) async throws -> Print
         slicedMetadata = await parser.parseMetadata(from: fileURL)
     }
 
-    // Create model entry
-    let model = await MainActor.run {
-        let m = PrintModel(
-            name: url.deletingPathExtension().lastPathComponent,
-            fileURL: relativePath,
-            fileSize: fileSize,
-            source: .imported,
-            thumbnailData: thumbnailData
-        )
-        if let metadata = slicedMetadata {
-            m.applyMetadata(metadata)
-        }
-        context.insert(m)
-        return m
+    // Create model entry (already on MainActor)
+    let model = PrintModel(
+        name: url.deletingPathExtension().lastPathComponent,
+        fileURL: relativePath,
+        fileSize: fileSize,
+        source: .imported,
+        thumbnailData: thumbnailData
+    )
+    if let metadata = slicedMetadata {
+        model.applyMetadata(metadata)
     }
+    context.insert(model)
 
     // Analyze mesh dimensions for mesh formats
     if fileType.needsSlicing {
         let analyzer = MeshAnalyzer()
         if let info = try? await analyzer.analyze(url: fileURL) {
-            await MainActor.run {
-                model.applyMeshInfo(info)
-            }
+            model.applyMeshInfo(info)
         }
     }
 

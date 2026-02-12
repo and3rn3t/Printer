@@ -13,7 +13,7 @@ import UniformTypeIdentifiers
 // MARK: - File Type
 
 /// Recognized 3D file formats
-enum ModelFileType: String, Codable, CaseIterable {
+nonisolated enum ModelFileType: String, Codable, CaseIterable, Sendable {
     case stl
     case obj
     case usdz
@@ -61,7 +61,7 @@ enum ModelFileType: String, Codable, CaseIterable {
 // MARK: - Sort Option
 
 /// Available sort options for the model library
-enum ModelSortOption: String, CaseIterable, Identifiable {
+enum ModelSortOption: String, CaseIterable, Identifiable, Sendable {
     case dateNewest = "Date (Newest)"
     case dateOldest = "Date (Oldest)"
     case nameAZ = "Name (A-Z)"
@@ -74,7 +74,7 @@ enum ModelSortOption: String, CaseIterable, Identifiable {
 }
 
 /// Available filter options for the model library
-enum ModelFilterOption: String, CaseIterable, Identifiable {
+enum ModelFilterOption: String, CaseIterable, Identifiable, Sendable {
     case all = "All"
     case scanned = "Scanned"
     case imported = "Imported"
@@ -89,6 +89,8 @@ enum ModelFilterOption: String, CaseIterable, Identifiable {
 /// Represents a 3D model that can be printed
 @Model
 final class PrintModel {
+    #Index<PrintModel>([\.modifiedDate], [\.name], [\.isFavorite])
+
     @Attribute(.unique) var id: UUID
     var name: String
     var createdDate: Date
@@ -244,7 +246,7 @@ extension PrintModel: Transferable {
     }
 }
 
-enum ModelSource: Codable {
+nonisolated enum ModelSource: Codable, Sendable {
     case scanned
     case imported
     case downloaded
@@ -253,6 +255,8 @@ enum ModelSource: Codable {
 /// Represents a print job sent to a printer
 @Model
 final class PrintJob {
+    #Index<PrintJob>([\.startDate], [\.printerName], [\.printerName, \.startDate])
+
     @Attribute(.unique) var id: UUID
     var startDate: Date
     var endDate: Date?
@@ -336,7 +340,7 @@ final class PrintJob {
     }
 }
 
-enum PrintStatus: Codable {
+nonisolated enum PrintStatus: Codable, Sendable {
     case preparing
     case uploading
     case queued
@@ -347,7 +351,7 @@ enum PrintStatus: Codable {
 }
 
 /// Structured reason for a print failure.
-enum FailureReason: String, Codable, CaseIterable, Identifiable {
+nonisolated enum FailureReason: String, Codable, CaseIterable, Identifiable, Sendable {
     case adhesion = "Bed Adhesion"
     case supportFailure = "Support Failure"
     case fepDamage = "FEP Damage"
@@ -386,7 +390,7 @@ enum FailureReason: String, Codable, CaseIterable, Identifiable {
 /// - `act`: Anycubic TCP protocol (Photon resin printers, port 6000)
 /// - `octoprint`: OctoPrint-compatible REST API (FDM printers, port 80)
 /// - `anycubicHTTP`: Anycubic native HTTP API (port 18910)
-enum PrinterProtocol: String, Codable {
+nonisolated enum PrinterProtocol: String, Codable, Sendable {
     case act
     case octoprint
     case anycubicHTTP

@@ -36,7 +36,7 @@ actor STLFileManager {
     
     /// Import an STL file from a URL
     func importSTL(from sourceURL: URL) async throws -> (url: URL, size: Int64) {
-        let destinationURL = try await stlDirectory
+        let destinationURL = try stlDirectory
             .appendingPathComponent(sourceURL.lastPathComponent)
         
         // If file exists, make it unique

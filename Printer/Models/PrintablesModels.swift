@@ -10,14 +10,14 @@ import Foundation
 // MARK: - GraphQL Request/Response Wrappers
 
 /// Wrapper for GraphQL POST requests to the Printables API
-struct GraphQLRequest: Encodable {
+nonisolated struct GraphQLRequest: Encodable {
     let operationName: String
     let query: String
     let variables: [String: GraphQLValue]
 }
 
 /// Type-erased wrapper for GraphQL variables (String, Int, Bool, nil, etc.)
-enum GraphQLValue: Encodable {
+nonisolated enum GraphQLValue: Encodable {
     case string(String)
     case int(Int)
     case bool(Bool)
@@ -35,52 +35,52 @@ enum GraphQLValue: Encodable {
 }
 
 /// Top-level GraphQL response envelope
-struct GraphQLResponse<T: Decodable>: Decodable {
+nonisolated struct GraphQLResponse<T: Decodable>: Decodable {
     let data: T?
     let errors: [GraphQLError]?
 }
 
 /// GraphQL error returned by the server
-struct GraphQLError: Decodable, Sendable {
+nonisolated struct GraphQLError: Decodable, Sendable {
     let message: String
 }
 
 // MARK: - Search Response
 
 /// Response type for the `searchPrints2` query
-struct SearchPrintsData: Decodable {
+nonisolated struct SearchPrintsData: Decodable {
     let searchPrints2: SearchPrintsList
 }
 
-struct SearchPrintsList: Decodable {
+nonisolated struct SearchPrintsList: Decodable {
     let items: [PrintablesSearchResult]
 }
 
 // MARK: - Model Detail Response
 
 /// Response type for the `print(id:)` query
-struct PrintDetailData: Decodable {
+nonisolated struct PrintDetailData: Decodable {
     let print: PrintablesModelDetail
 }
 
 /// Response type for the `getDownloadLink` mutation
-struct GetDownloadLinkData: Decodable {
+nonisolated struct GetDownloadLinkData: Decodable {
     let getDownloadLink: GetDownloadLinkResult
 }
 
-struct GetDownloadLinkResult: Decodable {
+nonisolated struct GetDownloadLinkResult: Decodable {
     let ok: Bool
     let output: GetDownloadLinkOutput?
 }
 
-struct GetDownloadLinkOutput: Decodable {
+nonisolated struct GetDownloadLinkOutput: Decodable {
     let link: String
 }
 
 // MARK: - Printables Data Types
 
 /// A search result from `searchPrints2` — lightweight summary
-struct PrintablesSearchResult: Decodable, Identifiable, Sendable {
+nonisolated struct PrintablesSearchResult: Decodable, Identifiable, Sendable {
     let id: String
     let name: String
     let image: PrintablesImage
@@ -115,7 +115,7 @@ struct PrintablesSearchResult: Decodable, Identifiable, Sendable {
 }
 
 /// Full model detail from `print(id:)` — includes files, description, author
-struct PrintablesModelDetail: Decodable, Identifiable, Sendable {
+nonisolated struct PrintablesModelDetail: Decodable, Identifiable, Sendable {
     let id: String
     let name: String
     let images: [PrintablesImage]?
@@ -138,7 +138,7 @@ struct PrintablesModelDetail: Decodable, Identifiable, Sendable {
 }
 
 /// Image associated with a Printables model
-struct PrintablesImage: Decodable, Identifiable, Sendable {
+nonisolated struct PrintablesImage: Decodable, Identifiable, Sendable {
     let id: String?
     let filePath: String
     let rotation: Int
@@ -151,7 +151,7 @@ struct PrintablesImage: Decodable, Identifiable, Sendable {
 }
 
 /// Author of a Printables model
-struct PrintablesUser: Decodable, Sendable {
+nonisolated struct PrintablesUser: Decodable, Sendable {
     let id: String
     let publicUsername: String
     let avatarFilePath: String
@@ -165,13 +165,13 @@ struct PrintablesUser: Decodable, Sendable {
 }
 
 /// Tag / keyword on a Printables model
-struct PrintablesTag: Decodable, Identifiable, Sendable {
+nonisolated struct PrintablesTag: Decodable, Identifiable, Sendable {
     let id: String
     let name: String
 }
 
 /// A downloadable file (STL, GCODE, or SLA) from Printables
-struct PrintablesFile: Decodable, Identifiable, Sendable {
+nonisolated struct PrintablesFile: Decodable, Identifiable, Sendable {
     let id: String
     let name: String
     let fileSize: Int
@@ -189,32 +189,32 @@ struct PrintablesFile: Decodable, Identifiable, Sendable {
 }
 
 /// Category of a Printables model
-struct PrintablesCategory: Decodable, Sendable {
+nonisolated struct PrintablesCategory: Decodable, Sendable {
     let id: String
     let path: [PrintablesCategoryPath]?
 }
 
-struct PrintablesCategoryPath: Decodable, Identifiable, Sendable {
+nonisolated struct PrintablesCategoryPath: Decodable, Identifiable, Sendable {
     let id: String
     let name: String?
 }
 
 /// License info for a Printables model
-struct PrintablesLicense: Decodable, Sendable {
+nonisolated struct PrintablesLicense: Decodable, Sendable {
     let id: String
     let name: String?
     let disallowRemixing: Bool?
 }
 
 /// Lightweight file reference used in search results (ID only)
-struct PrintablesFileRef: Decodable, Identifiable, Sendable {
+nonisolated struct PrintablesFileRef: Decodable, Identifiable, Sendable {
     let id: String
 }
 
 // MARK: - Search Ordering
 
 /// Sort order for Printables search results
-enum PrintablesOrdering: String, CaseIterable, Identifiable {
+nonisolated enum PrintablesOrdering: String, CaseIterable, Identifiable {
     case bestMatch = "Best Match"
     case latest = "Newest"
     case popular = "Popular"

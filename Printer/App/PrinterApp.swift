@@ -8,7 +8,10 @@
 import SwiftUI
 import SwiftData
 import WidgetKit
+import OSLog
+#if os(iOS)
 import BackgroundTasks
+#endif
 
 @main
 struct PrinterApp: App {
@@ -44,6 +47,8 @@ struct PrinterApp: App {
         do {
             return try ModelContainer(for: schema, configurations: [modelConfiguration])
         } catch {
+            // Log the error before crashing — helps diagnose schema migration failures
+            AppLogger.data.critical("ModelContainer creation failed: \(error.localizedDescription)")
             fatalError("Could not create ModelContainer: \(error)")
         }
     }()
@@ -114,7 +119,7 @@ struct PrinterApp: App {
             widgetData.save()
             WidgetCenter.shared.reloadAllTimelines()
         } catch {
-            // Non-fatal — widget data will be stale
+            AppLogger.app.warning("Failed to update widget data: \(error.localizedDescription)")
         }
     }
 
@@ -127,7 +132,7 @@ struct PrinterApp: App {
             let printers = try context.fetch(FetchDescriptor<Printer>())
             MaintenanceScheduler.checkAndNotify(printers: printers)
         } catch {
-            // Non-fatal
+            AppLogger.app.warning("Failed to check maintenance alerts: \(error.localizedDescription)")
         }
     }
 
@@ -140,22 +145,25 @@ struct PrinterApp: App {
         let cutoff = Calendar.current.date(byAdding: .day, value: -completedJobRetentionDays, to: Date()) ?? Date()
 
         do {
-            let descriptor = FetchDescriptor<PrintJob>()
-            let allJobs = try context.fetch(descriptor)
-            var deletedCount = 0
+            // Fetch jobs older than cutoff, then filter terminal status in memory
+            // (SwiftData #Predicate doesn't support non-RawRepresentable enum comparison)
+            var descriptor = FetchDescriptor<PrintJob>(
+                predicate: #Predicate<PrintJob> { $0.startDate < cutoff }
+            )
+            descriptor.fetchLimit = 1000 // Safety cap for large databases
+            let candidates = try context.fetch(descriptor)
+            let oldJobs = candidates.filter {
+                $0.status == .completed || $0.status == .failed || $0.status == .cancelled
+            }
 
-            for job in allJobs {
-                let isTerminal = job.status == .completed || job.status == .failed || job.status == .cancelled
-                guard isTerminal, job.startDate < cutoff else { continue }
+            guard !oldJobs.isEmpty else { return }
+            for job in oldJobs {
                 context.delete(job)
-                deletedCount += 1
             }
-
-            if deletedCount > 0 {
-                try context.save()
-            }
+            try context.save()
+            AppLogger.data.info("Cleaned up \(oldJobs.count) old print jobs")
         } catch {
-            // Non-fatal — cleanup will retry next launch
+            AppLogger.data.warning("Failed to cleanup old jobs: \(error.localizedDescription)")
         }
     }
 }

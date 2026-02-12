@@ -115,7 +115,7 @@ actor AnycubicPrinterAPI {
 
     private let urlSession: URLSession
     private var uploadDelegates: [UUID: UploadProgressDelegate] = [:]
-    
+
     /// ACT protocol service for Photon resin printers
     private let photonService = PhotonPrinterService.shared
 
@@ -178,7 +178,7 @@ actor AnycubicPrinterAPI {
         if try await photonService.testConnection(ipAddress: ipAddress) {
             return true
         }
-        
+
         // Fall back to HTTP-based protocols
         return try await withRetry(config: retryConfig) { [urlSession] in
             // Try Anycubic native endpoint first
@@ -231,7 +231,7 @@ actor AnycubicPrinterAPI {
         if printerProtocol == .act {
             return try await photonService.getPrinterStatus(ipAddress: ipAddress)
         }
-        
+
         // HTTP protocol paths
         return try await withRetry { [urlSession] in
             // Try Anycubic native endpoint first
@@ -428,7 +428,7 @@ actor AnycubicPrinterAPI {
             try await photonService.startPrint(ipAddress: ipAddress, filename: filename)
             return
         }
-        
+
         try await withRetry { [urlSession] in
             guard let url = URL(string: "http://\(ipAddress)/api/files/local/\(filename)") else {
                 throw APIError.invalidURL
@@ -634,13 +634,16 @@ actor AnycubicPrinterAPI {
             let (data, response) = try await urlSession.data(for: request)
 
             guard let httpResponse = response as? HTTPURLResponse,
-                  httpResponse.statusCode == 200 else { return nil }
+                httpResponse.statusCode == 200
+            else { return nil }
 
             guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let webcam = json["webcam"] as? [String: Any] else { return nil }
+                let webcam = json["webcam"] as? [String: Any]
+            else { return nil }
 
             // Try snapshotUrl first, then streamUrl
-            if let snapshotUrlString = webcam["snapshotUrl"] as? String, !snapshotUrlString.isEmpty {
+            if let snapshotUrlString = webcam["snapshotUrl"] as? String, !snapshotUrlString.isEmpty
+            {
                 // Resolve relative URLs
                 if snapshotUrlString.hasPrefix("http") {
                     return URL(string: snapshotUrlString)
@@ -669,7 +672,7 @@ actor AnycubicPrinterAPI {
         if await PhotonPrinterService.probe(ipAddress: ipAddress) {
             return true
         }
-        
+
         guard let url = URL(string: "http://\(ipAddress)/api/version") else {
             return false
         }
@@ -721,99 +724,5 @@ private final class UploadProgressDelegate: NSObject, URLSessionTaskDelegate, Se
         guard totalBytesExpectedToSend > 0 else { return }
         let progress = Double(totalBytesSent) / Double(totalBytesExpectedToSend)
         progressHandler(min(progress, 0.99))  // Reserve 1.0 for completion confirmation
-    }
-}
-
-// MARK: - Response Models
-
-/// Printer status from the API
-struct PrinterStatus: Codable, Sendable {
-    let state: PrinterState
-    let temperature: Temperature?
-    let printerName: String?
-
-    init(state: PrinterState, temperature: Temperature?, printerName: String? = nil) {
-        self.state = state
-        self.temperature = temperature
-        self.printerName = printerName
-    }
-
-    enum CodingKeys: String, CodingKey {
-        case state
-        case temperature = "temperature"
-        case printerName
-    }
-}
-
-struct PrinterState: Codable, Sendable {
-    let text: String
-    let flags: StateFlags
-}
-
-struct StateFlags: Codable, Sendable {
-    let operational: Bool
-    let printing: Bool
-    let paused: Bool
-    let ready: Bool
-}
-
-struct Temperature: Codable, Sendable {
-    let bed: TemperatureData?
-    let tool0: TemperatureData?
-}
-
-struct TemperatureData: Codable, Sendable {
-    let actual: Double
-    let target: Double
-}
-
-/// Status of the current print job
-struct PrintJobStatus: Codable, Sendable {
-    let job: JobInfo?
-    let progress: ProgressInfo?
-    let state: String
-
-    struct JobInfo: Codable, Sendable {
-        let file: JobFile?
-        let estimatedPrintTime: Double?
-
-        struct JobFile: Codable, Sendable {
-            let name: String?
-            let size: Int64?
-        }
-    }
-
-    struct ProgressInfo: Codable, Sendable {
-        let completion: Double?
-        let printTime: Double?
-        let printTimeLeft: Double?
-    }
-}
-
-/// A file stored on the printer
-struct PrinterFile: Codable, Identifiable, Sendable {
-    let name: String
-    let size: Int64?
-    let date: Date?
-
-    var id: String { name }
-}
-
-/// Response wrapper for file list
-struct FileListResponse: Codable, Sendable {
-    let files: [PrinterFile]
-}
-
-/// Response from file upload
-struct UploadResponse: Codable, Sendable {
-    let files: FileInfo
-
-    struct FileInfo: Codable, Sendable {
-        let local: FileDetail
-
-        struct FileDetail: Codable, Sendable {
-            let name: String
-            let origin: String
-        }
     }
 }

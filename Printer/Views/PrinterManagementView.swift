@@ -141,7 +141,7 @@ struct PrinterRowView: View {
                     Text(status.displayText)
                         .font(.caption2)
                         .fontWeight(.medium)
-                        .foregroundStyle(iconColor(for: status))
+                        .foregroundStyle(status.color)
                 } else if let lastConnected = printer.lastConnected {
                     Text(lastConnected.formatted(.relative(presentation: .named)))
                         .font(.caption2)
@@ -199,7 +199,7 @@ struct PrinterRowView: View {
             if isReachable == false { return .gray }
             return .gray.opacity(0.5)
         }
-        return iconColor(for: status)
+        return status.color
     }
 
     private var statusIcon: String {
@@ -225,16 +225,6 @@ struct PrinterRowView: View {
     private var connectionText: String {
         if isReachable == nil { return "Checking…" }
         return isReachable == true ? "Online" : "Offline"
-    }
-
-    private func iconColor(for status: PhotonPrinterService.PhotonStatus) -> Color {
-        switch status {
-        case .idle: return .green
-        case .printing: return .blue
-        case .paused: return .orange
-        case .stopping: return .red
-        case .unknown: return .gray
-        }
     }
 }
 

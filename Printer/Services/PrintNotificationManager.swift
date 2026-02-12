@@ -13,7 +13,7 @@ import UserNotifications
 /// Posts notifications when prints complete, fail, or are cancelled while
 /// the app is backgrounded. Respects the user's notification preference
 /// stored in `UserDefaults` under the `enablePrintNotifications` key.
-final class PrintNotificationManager: @unchecked Sendable {
+nonisolated final class PrintNotificationManager: @unchecked Sendable {
     static let shared = PrintNotificationManager()
 
     // MARK: - Notification Categories

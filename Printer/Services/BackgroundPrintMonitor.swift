@@ -189,7 +189,7 @@ actor BackgroundPrintMonitor {
 
 // MARK: - Poll Result
 
-private struct PrinterPollResult {
+private nonisolated struct PrinterPollResult {
     let isPrinting: Bool
     let progress: Double?
     let fileName: String?

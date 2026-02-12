@@ -172,7 +172,7 @@ actor ExportService {
 
 // MARK: - PrintStatus CSV Extension
 
-extension PrintStatus {
+nonisolated extension PrintStatus {
     var csvValue: String {
         switch self {
         case .preparing: return "Preparing"

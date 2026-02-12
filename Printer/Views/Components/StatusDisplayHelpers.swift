@@ -70,10 +70,49 @@ extension ModelSource {
     }
 }
 
+// MARK: - PrinterProtocol Display Helpers
+
+extension PrinterProtocol {
+    /// Human-readable display label
+    var displayLabel: String {
+        switch self {
+        case .act: return "ACT"
+        case .octoprint: return "OctoPrint"
+        case .anycubicHTTP: return "HTTP"
+        }
+    }
+}
+
+// MARK: - PhotonStatus Display Helpers
+
+extension PhotonPrinterService.PhotonStatus {
+    /// Color associated with this printer status
+    var color: Color {
+        switch self {
+        case .idle: return .green
+        case .printing: return .blue
+        case .paused: return .orange
+        case .stopping: return .red
+        case .unknown: return .gray
+        }
+    }
+
+    /// SF Symbol name representing this printer status
+    var icon: String {
+        switch self {
+        case .idle: return "checkmark.circle"
+        case .printing: return "printer.fill"
+        case .paused: return "pause.circle"
+        case .stopping: return "stop.circle"
+        case .unknown: return "questionmark.circle"
+        }
+    }
+}
+
 // MARK: - Duration Formatting
 
 /// Format a duration in seconds to a human-readable string
-func formatDuration(_ seconds: Double) -> String {
+nonisolated func formatDuration(_ seconds: Double) -> String {
     let totalSeconds = Int(seconds)
     let hours = totalSeconds / 3600
     let minutes = (totalSeconds % 3600) / 60

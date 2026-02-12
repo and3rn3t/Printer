@@ -410,7 +410,7 @@ struct SettingsView: View {
 
             var totalSize: Int64 = 0
             if let enumerator = FileManager.default.enumerator(at: stlDir, includingPropertiesForKeys: [.fileSizeKey]) {
-                for case let fileURL as URL in enumerator {
+                while let fileURL = enumerator.nextObject() as? URL {
                     let values = try? fileURL.resourceValues(forKeys: [.fileSizeKey])
                     totalSize += Int64(values?.fileSize ?? 0)
                 }
@@ -446,8 +446,8 @@ struct SettingsView: View {
     /// Re-scan all sliced models for missing metadata and thumbnails
     private func rescanLibrary() {
         let slicedModels = models.filter { $0.fileType.isSliced }
-        let needsMetadata = slicedModels.filter { !$0.hasSlicedMetadata }
-        let needsThumbnail = slicedModels.filter { $0.thumbnailData == nil }
+        _ = slicedModels.filter { !$0.hasSlicedMetadata }
+        _ = slicedModels.filter { $0.thumbnailData == nil }
 
         // Models that need either metadata or thumbnail
         let modelsToScan = slicedModels.filter { !$0.hasSlicedMetadata || $0.thumbnailData == nil }

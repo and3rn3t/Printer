@@ -14,7 +14,6 @@ import SwiftData
 struct PrinterDetailView: View {
     @Bindable var printer: Printer
     @Environment(\.modelContext) private var modelContext
-    @Query(sort: \PrintJob.startDate, order: .reverse) private var allJobs: [PrintJob]
     @State private var manager = PrinterConnectionManager()
     @State private var controlError: String?
     @State private var showingControlError = false
@@ -22,12 +21,15 @@ struct PrinterDetailView: View {
     @State private var webcamURL: URL?
     @State private var tempHistory = TemperatureHistoryManager()
 
-    /// Recent jobs for this printer
+    /// Recent jobs for this printer (fetched on demand to avoid loading ALL jobs)
     private var recentJobs: [PrintJob] {
-        allJobs
-            .filter { $0.printerName == printer.name }
-            .prefix(5)
-            .map { $0 }
+        let printerName = printer.name
+        var descriptor = FetchDescriptor<PrintJob>(
+            predicate: #Predicate { $0.printerName == printerName },
+            sortBy: [SortDescriptor(\.startDate, order: .reverse)]
+        )
+        descriptor.fetchLimit = 5
+        return (try? modelContext.fetch(descriptor)) ?? []
     }
 
     /// Maintenance alerts for this printer
@@ -56,83 +58,14 @@ struct PrinterDetailView: View {
                 printControlsSection
             }
 
-            // Webcam feed (OctoPrint with webcam configured)
-            if let webcamURL {
-                Section("Camera") {
-                    WebcamStreamView(snapshotURL: webcamURL, refreshInterval: 2.0)
-                }
-            }
-
-            // Time-lapse photo log link (when active job has snapshots)
-            if let activeJob = manager.activeJob {
-                Section("Time-lapse") {
-                    NavigationLink {
-                        PhotoLogView(printJob: activeJob)
-                    } label: {
-                        Label("View Photo Log", systemImage: "camera.fill")
-                    }
-                }
-            }
-
-            // Temperature monitoring (HTTP printers with temp data)
-            if printer.printerProtocol != .act,
-               manager.connectionState.isConnected,
-               manager.printerStatus?.temperature != nil {
-                Section("Temperature") {
-                    TemperatureChartView(
-                        readings: tempHistory.readings,
-                        currentBedTemp: manager.printerStatus?.temperature?.bed?.actual,
-                        currentBedTarget: manager.printerStatus?.temperature?.bed?.target,
-                        currentToolTemp: manager.printerStatus?.temperature?.tool0?.actual,
-                        currentToolTarget: manager.printerStatus?.temperature?.tool0?.target
-                    )
-                }
-            }
+            // Webcam / time-lapse / temperature
+            cameraAndMonitoringSections
 
             // System information
             systemInfoSection
 
-            // Printer file browser (OctoPrint only)
-            if printer.printerProtocol == .octoprint && manager.connectionState.isConnected {
-                Section {
-                    NavigationLink {
-                        PrinterFileBrowserView(printer: printer)
-                    } label: {
-                        Label {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Printer Files")
-                                Text("Browse and manage files on this printer")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                        } icon: {
-                            Image(systemName: "folder")
-                                .foregroundStyle(.blue)
-                        }
-                    }
-                }
-            }
-
-            // USB file transfer note (ACT resin printers only)
-            if printer.printerProtocol == .act && manager.connectionState.isConnected {
-                Section {
-                    Label {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("USB File Transfer Required")
-                                .font(.subheadline)
-                                .fontWeight(.medium)
-                            Text("Resin printers using the ACT protocol do not support wireless file transfer. Copy sliced files (.pwmx) to a USB drive and insert it into the printer. Then use \"Send to Printer\" to start the print by filename.")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    } icon: {
-                        Image(systemName: "usb")
-                            .foregroundStyle(.orange)
-                    }
-                } header: {
-                    Text("File Transfer")
-                }
-            }
+            // File transfer sections
+            fileTransferSections
 
             // Recent print history
             if !recentJobs.isEmpty {
@@ -142,41 +75,8 @@ struct PrinterDetailView: View {
             // Connection details
             connectionDetailsSection
 
-            // Maintenance alerts banner
-            if !maintenanceAlerts.isEmpty {
-                Section {
-                    ForEach(maintenanceAlerts) { alert in
-                        HStack(spacing: 10) {
-                            Image(systemName: alert.type.icon)
-                                .foregroundStyle(alert.isOverdue ? .red : .orange)
-                                .frame(width: 24)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(alert.type.rawValue)
-                                    .font(.subheadline)
-                                    .fontWeight(.medium)
-                                Text(alert.displayText)
-                                    .font(.caption)
-                                    .foregroundStyle(alert.isOverdue ? .red : .orange)
-                            }
-                            Spacer()
-                            Image(systemName: alert.isOverdue ? "exclamationmark.circle.fill" : "clock.badge.exclamationmark")
-                                .foregroundStyle(alert.isOverdue ? .red : .orange)
-                        }
-                    }
-                } header: {
-                    Label("Maintenance Due", systemImage: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.orange)
-                }
-            }
-
-            // Maintenance
-            Section {
-                NavigationLink {
-                    MaintenanceLogView(printer: printer)
-                } label: {
-                    Label("Maintenance Log", systemImage: "wrench.and.screwdriver")
-                }
-            }
+            // Maintenance sections
+            maintenanceSections
         }
         .navigationTitle(printer.name)
         .toolbar {
@@ -222,6 +122,132 @@ struct PrinterDetailView: View {
             Button("OK", role: .cancel) { }
         } message: {
             Text(controlError ?? "An unknown error occurred.")
+        }
+    }
+
+    // MARK: - Camera & Monitoring
+
+    @ViewBuilder
+    private var cameraAndMonitoringSections: some View {
+        // Webcam feed (OctoPrint with webcam configured)
+        if let webcamURL {
+            Section("Camera") {
+                WebcamStreamView(snapshotURL: webcamURL, refreshInterval: 2.0)
+            }
+        }
+
+        // Time-lapse photo log link (when active job has snapshots)
+        if let activeJob = manager.activeJob {
+            Section("Time-lapse") {
+                NavigationLink {
+                    PhotoLogView(printJob: activeJob)
+                } label: {
+                    Label("View Photo Log", systemImage: "camera.fill")
+                }
+            }
+        }
+
+        // Temperature monitoring (HTTP printers with temp data)
+        if printer.printerProtocol != .act,
+           manager.connectionState.isConnected,
+           manager.printerStatus?.temperature != nil {
+            Section("Temperature") {
+                TemperatureChartView(
+                    readings: tempHistory.readings,
+                    currentBedTemp: manager.printerStatus?.temperature?.bed?.actual,
+                    currentBedTarget: manager.printerStatus?.temperature?.bed?.target,
+                    currentToolTemp: manager.printerStatus?.temperature?.tool0?.actual,
+                    currentToolTarget: manager.printerStatus?.temperature?.tool0?.target
+                )
+            }
+        }
+    }
+
+    // MARK: - File Transfer
+
+    @ViewBuilder
+    private var fileTransferSections: some View {
+        // Printer file browser (OctoPrint only)
+        if printer.printerProtocol == .octoprint && manager.connectionState.isConnected {
+            Section {
+                NavigationLink {
+                    PrinterFileBrowserView(printer: printer)
+                } label: {
+                    Label {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Printer Files")
+                            Text("Browse and manage files on this printer")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    } icon: {
+                        Image(systemName: "folder")
+                            .foregroundStyle(.blue)
+                    }
+                }
+            }
+        }
+
+        // USB file transfer note (ACT resin printers only)
+        if printer.printerProtocol == .act && manager.connectionState.isConnected {
+            Section {
+                Label {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("USB File Transfer Required")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                        Text("Resin printers using the ACT protocol do not support wireless file transfer. Copy sliced files (.pwmx) to a USB drive and insert it into the printer. Then use \"Send to Printer\" to start the print by filename.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                } icon: {
+                    Image(systemName: "usb")
+                        .foregroundStyle(.orange)
+                }
+            } header: {
+                Text("File Transfer")
+            }
+        }
+    }
+
+    // MARK: - Maintenance
+
+    @ViewBuilder
+    private var maintenanceSections: some View {
+        // Maintenance alerts banner
+        if !maintenanceAlerts.isEmpty {
+            Section {
+                ForEach(maintenanceAlerts) { alert in
+                    HStack(spacing: 10) {
+                        Image(systemName: alert.type.icon)
+                            .foregroundStyle(alert.isOverdue ? .red : .orange)
+                            .frame(width: 24)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(alert.type.rawValue)
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                            Text(alert.displayText)
+                                .font(.caption)
+                                .foregroundStyle(alert.isOverdue ? .red : .orange)
+                        }
+                        Spacer()
+                        Image(systemName: alert.isOverdue ? "exclamationmark.circle.fill" : "clock.badge.exclamationmark")
+                            .foregroundStyle(alert.isOverdue ? .red : .orange)
+                    }
+                }
+            } header: {
+                Label("Maintenance Due", systemImage: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.orange)
+            }
+        }
+
+        // Maintenance log link
+        Section {
+            NavigationLink {
+                MaintenanceLogView(printer: printer)
+            } label: {
+                Label("Maintenance Log", systemImage: "wrench.and.screwdriver")
+            }
         }
     }
 
@@ -337,13 +363,13 @@ struct PrinterDetailView: View {
         VStack(spacing: 8) {
             Image(systemName: iconName(for: status))
                 .font(.system(size: 48))
-                .foregroundStyle(iconColor(for: status).gradient)
+                .foregroundStyle((status?.color ?? .gray).gradient)
                 .symbolEffect(.pulse, options: .repeating, isActive: status == .printing)
 
             Text(status?.displayText ?? "Unknown")
                 .font(.title3)
                 .fontWeight(.semibold)
-                .foregroundStyle(iconColor(for: status))
+                .foregroundStyle(status?.color ?? .gray)
         }
     }
 
@@ -765,17 +791,6 @@ struct PrinterDetailView: View {
         case .stopping: return "stop.circle"
         case .unknown: return "questionmark.circle"
         case .none: return "circle.dotted"
-        }
-    }
-
-    private func iconColor(for status: PhotonPrinterService.PhotonStatus?) -> Color {
-        switch status {
-        case .idle: return .green
-        case .printing: return .blue
-        case .paused: return .orange
-        case .stopping: return .red
-        case .unknown: return .gray
-        case .none: return .gray
         }
     }
 

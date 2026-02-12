@@ -32,6 +32,7 @@ struct DashboardView: View {
     /// Recent completed/failed/cancelled jobs (last 5)
     private var recentJobs: [PrintJob] {
         allJobs
+            .lazy
             .filter { $0.status == .completed || $0.status == .failed || $0.status == .cancelled }
             .prefix(5)
             .map { $0 }
@@ -318,7 +319,7 @@ struct DashboardView: View {
                 Text(status.displayText)
                     .font(.caption)
                     .fontWeight(.medium)
-                    .foregroundStyle(statusColor(for: status))
+                    .foregroundStyle(status.color)
             } else if isOnline {
                 Text("Online")
                     .font(.caption)
@@ -478,16 +479,6 @@ struct DashboardView: View {
         let total = allJobs.filter { $0.status == .completed || $0.status == .failed }.count
         guard total > 0 else { return "—" }
         return "\(Int(Double(completed) / Double(total) * 100))%"
-    }
-
-    private func statusColor(for status: PhotonPrinterService.PhotonStatus) -> Color {
-        switch status {
-        case .idle: return .green
-        case .printing: return .blue
-        case .paused: return .orange
-        case .stopping: return .yellow
-        case .unknown: return .gray
-        }
     }
 
     private func refreshAllPrinters() {
