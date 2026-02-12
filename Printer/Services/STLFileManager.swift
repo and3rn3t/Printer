@@ -102,6 +102,43 @@ actor STLFileManager {
         return url.lastPathComponent
     }
 
+    /// Validate whether the given data represents a valid STL file (binary or ASCII)
+    func validateSTL(data: Data) -> Bool {
+        guard !data.isEmpty else { return false }
+
+        // Check for ASCII STL (starts with "solid")
+        if let prefix = String(data: data.prefix(5), encoding: .utf8),
+           prefix.lowercased() == "solid" {
+            // Verify it also contains "endsolid"
+            if let text = String(data: data, encoding: .utf8),
+               text.contains("endsolid") {
+                return true
+            }
+        }
+
+        // Check for binary STL: 80-byte header + 4-byte triangle count + n*50 bytes
+        guard data.count >= 84 else { return false }
+        let triangleCount = data.withUnsafeBytes { buffer -> UInt32 in
+            buffer.load(fromByteOffset: 80, as: UInt32.self)
+        }
+        let expectedSize = 84 + Int(triangleCount) * 50
+        return data.count >= expectedSize
+    }
+
+    /// Save STL data to the STL directory with the given filename
+    func saveSTL(data: Data, filename: String) async throws -> (url: URL, size: Int64) {
+        let destinationURL = try stlDirectory.appendingPathComponent(filename)
+        let uniqueURL = try makeUniqueURL(destinationURL)
+        try data.write(to: uniqueURL)
+        return (uniqueURL, Int64(data.count))
+    }
+
+    /// Read STL file data from a path
+    func readSTL(at path: String) async throws -> Data {
+        let url = URL(fileURLWithPath: path)
+        return try Data(contentsOf: url)
+    }
+
 }
 
 extension UTType {
