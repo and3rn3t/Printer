@@ -7,6 +7,7 @@
 
 import Foundation
 import SwiftData
+import OSLog
 #if canImport(UIKit)
 import UIKit
 #endif
@@ -156,6 +157,7 @@ actor ExportService {
             try content.write(to: fileURL, atomically: true, encoding: .utf8)
             return fileURL
         } catch {
+            AppLogger.fileOps.error("Failed to write temp file \(fileName): \(error.localizedDescription)")
             return nil
         }
     }

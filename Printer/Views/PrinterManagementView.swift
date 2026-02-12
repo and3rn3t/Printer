@@ -7,6 +7,7 @@
 
 import SwiftUI
 import SwiftData
+import OSLog
 
 struct PrinterManagementView: View {
     @Environment(\.dismiss) private var dismiss
@@ -165,16 +166,18 @@ struct PrinterRowView: View {
             // Quick probe to update row status
             if printer.printerProtocol == .act {
                 let service = PhotonPrinterService.shared
-                if let status = try? await service.getStatus(
-                    ipAddress: printer.ipAddress,
-                    port: printer.port
-                ) {
+                do {
+                    let status = try await service.getStatus(
+                        ipAddress: printer.ipAddress,
+                        port: printer.port
+                    )
                     await MainActor.run {
                         liveStatus = status
                         isReachable = true
                         printer.isConnected = true
                     }
-                } else {
+                } catch {
+                    AppLogger.network.debug("Quick check failed for \(printer.name): \(error.localizedDescription)")
                     await MainActor.run {
                         isReachable = false
                         printer.isConnected = false

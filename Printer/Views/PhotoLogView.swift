@@ -7,6 +7,7 @@
 
 import SwiftUI
 import SwiftData
+import OSLog
 
 /// Displays the time-lapse photo log for a specific print job.
 ///
@@ -110,7 +111,11 @@ struct PhotoLogView: View {
         for snapshot in snapshots {
             modelContext.delete(snapshot)
         }
-        try? modelContext.save()
+        do {
+            try modelContext.save()
+        } catch {
+            AppLogger.data.error("Failed to save after deleting snapshots: \(error.localizedDescription)")
+        }
         snapshots.removeAll()
     }
 

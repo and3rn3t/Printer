@@ -8,6 +8,7 @@
 import SwiftUI
 import SwiftData
 import UniformTypeIdentifiers
+import OSLog
 
 // MARK: - Shared File Import Helper
 
@@ -263,7 +264,11 @@ struct ContentView: View {
                 
                 // Delete the file
                 Task {
-                    try? await STLFileManager.shared.deleteSTL(at: model.resolvedFileURL.path)
+                    do {
+                        try await STLFileManager.shared.deleteSTL(at: model.resolvedFileURL.path)
+                    } catch {
+                        AppLogger.fileOps.error("Failed to delete file for \(model.name): \(error.localizedDescription)")
+                    }
                 }
                 
                 modelContext.delete(model)
@@ -808,7 +813,7 @@ struct ModelListView: View {
                 do {
                     try await importModelFile(url: url, into: context)
                 } catch {
-                    // Silently skip failed drops
+                    AppLogger.fileOps.error("Drag-and-drop import failed for \(url.lastPathComponent): \(error.localizedDescription)")
                 }
             }
         }

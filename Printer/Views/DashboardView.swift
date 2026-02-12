@@ -7,6 +7,7 @@
 
 import SwiftUI
 import SwiftData
+import OSLog
 
 /// Single-glance dashboard showing all printers' live status, active prints, and recent activity.
 struct DashboardView: View {
@@ -16,6 +17,8 @@ struct DashboardView: View {
 
     @State private var printerStates: [UUID: PrinterLiveState] = [:]
     @State private var refreshTimer: Timer?
+    @State private var errorMessage: String?
+    @State private var showingError = false
 
     /// Live state for a printer card
     struct PrinterLiveState {
@@ -204,6 +207,11 @@ struct DashboardView: View {
         .onAppear { refreshAllPrinters() }
         .onDisappear { refreshTimer?.invalidate() }
         .refreshable { refreshAllPrinters() }
+        .alert("Error", isPresented: $showingError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(errorMessage ?? "An unknown error occurred.")
+        }
     }
 
     // MARK: - Active Print Card
@@ -497,6 +505,7 @@ struct DashboardView: View {
                             printerStates[printer.id] = state
                         }
                     } else {
+                        AppLogger.network.debug("Dashboard: ACT status check failed for \(printer.name)")
                         await MainActor.run {
                             var state = printerStates[printer.id] ?? PrinterLiveState()
                             state.isReachable = false

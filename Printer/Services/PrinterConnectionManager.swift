@@ -8,6 +8,7 @@
 import Foundation
 import SwiftData
 import ActivityKit
+import OSLog
 
 /// Manages live connection state and periodic status polling for a printer.
 ///
@@ -114,6 +115,7 @@ final class PrinterConnectionManager {
     func startMonitoring(_ printer: Printer) {
         self.printer = printer
         stopMonitoring()
+        AppLogger.network.info("Starting monitoring for \(printer.name) (\(printer.ipAddress), \(printer.printerProtocol.rawValue))")
 
         connectionState = .connecting
 
@@ -176,6 +178,8 @@ final class PrinterConnectionManager {
         } catch {
             failedPolls += 1
             successfulPolls = 0
+            let failCount = self.failedPolls
+            AppLogger.network.warning("Status poll failed for \(printer.name) (attempt \(failCount)): \(error.localizedDescription)")
 
             if failedPolls >= 3 {
                 connectionState = .error(error.localizedDescription)
@@ -342,6 +346,7 @@ final class PrinterConnectionManager {
                 }
             }
         } catch {
+            AppLogger.network.warning("Failed to fetch sysinfo for \(printer.name): \(error.localizedDescription)")
             // Non-fatal — sysinfo is supplementary
         }
     }
@@ -431,6 +436,7 @@ final class PrinterConnectionManager {
     /// Create a new PrintJob when a print starts
     private func startPrintSession(printerName: String, printerIP: String, protocol proto: PrinterProtocol) {
         printSessionStart = Date()
+        AppLogger.printJob.info("Print session started on \(printerName) (\(proto.rawValue))")
 
         let job = PrintJob(
             printerName: printerName,
@@ -485,6 +491,8 @@ final class PrinterConnectionManager {
 
     /// Finalize the active print session
     private func completePrintSession(status: PrintStatus) {
+        AppLogger.printJob.info("Print session completed with status: \(status.csvValue)")
+
         // Add final elapsed time segment
         if let start = printSessionStart {
             let elapsed = Date().timeIntervalSince(start)
@@ -564,7 +572,10 @@ final class PrinterConnectionManager {
 
         // Find an active (non-depleted) inventory item for this profile
         let descriptor = FetchDescriptor<InventoryItem>()
-        guard let inventoryItems = try? modelContext.fetch(descriptor) else { return }
+        guard let inventoryItems = try? modelContext.fetch(descriptor) else {
+            AppLogger.data.warning("Failed to fetch inventory items for deduction")
+            return
+        }
 
         if let item = inventoryItems.first(where: { $0.resinProfile?.id == profile.id && !$0.isDepleted }) {
             item.deduct(Double(volume))

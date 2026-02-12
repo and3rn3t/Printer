@@ -7,6 +7,7 @@
 
 import Foundation
 import UserNotifications
+import OSLog
 
 /// Manages local notifications for print job state changes.
 ///
@@ -36,6 +37,7 @@ nonisolated final class PrintNotificationManager: @unchecked Sendable {
                 await registerCategories()
             }
         } catch {
+            AppLogger.background.warning("Notification authorization request failed: \(error.localizedDescription)")
             // Non-fatal — user simply won't get notifications
         }
     }

@@ -6,10 +6,9 @@
 //
 
 import Foundation
-
+import OSLog
 /// Handles communication with Anycubic 3D printers via their web interface
 ///
-/// Supports three protocols:
 /// - **ACT** (TCP port 6000): For Photon resin printers — delegates to `PhotonPrinterService`
 /// - **OctoPrint** (HTTP port 80): REST API for FDM printers with OctoPrint firmware
 /// - **Anycubic HTTP** (port 18910): Native Anycubic HTTP discovery/status endpoint
@@ -174,6 +173,8 @@ actor AnycubicPrinterAPI {
     func testConnection(ipAddress: String, retryConfig: RetryConfiguration = .default) async throws
         -> Bool
     {
+        AppLogger.network.info("Testing connection to \(ipAddress)")
+
         // Try ACT protocol first (Photon resin printers)
         if try await photonService.testConnection(ipAddress: ipAddress) {
             return true
@@ -229,8 +230,11 @@ actor AnycubicPrinterAPI {
     ) async throws -> PrinterStatus {
         // ACT protocol path — Photon resin printers
         if printerProtocol == .act {
+            AppLogger.network.debug("Fetching ACT status from \(ipAddress)")
             return try await photonService.getPrinterStatus(ipAddress: ipAddress)
         }
+
+        AppLogger.network.debug("Fetching HTTP status from \(ipAddress)")
 
         // HTTP protocol paths
         return try await withRetry { [urlSession] in
@@ -324,6 +328,8 @@ actor AnycubicPrinterAPI {
         filename: String,
         progress: @escaping @Sendable (Double) -> Void
     ) async throws {
+        AppLogger.network.info("Uploading \(filename) to \(ipAddress)")
+
         try await withRetry(config: .aggressive) { [self] in
             try await self.performUpload(
                 ipAddress: ipAddress,
@@ -662,6 +668,7 @@ actor AnycubicPrinterAPI {
 
             return nil
         } catch {
+            AppLogger.network.warning("Failed to fetch webcam URL from \(ipAddress): \(error.localizedDescription)")
             return nil
         }
     }
@@ -685,6 +692,7 @@ actor AnycubicPrinterAPI {
             let (_, response) = try await urlSession.data(for: request)
             return (response as? HTTPURLResponse)?.statusCode == 200
         } catch {
+            AppLogger.network.debug("OctoPrint reachability check failed for \(ipAddress): \(error.localizedDescription)")
             // Also try Anycubic native endpoint
             guard let anycubicURL = URL(string: "http://\(ipAddress):18910/info") else {
                 return false
@@ -697,6 +705,7 @@ actor AnycubicPrinterAPI {
                 let (_, response) = try await urlSession.data(for: nativeRequest)
                 return (response as? HTTPURLResponse)?.statusCode == 200
             } catch {
+                AppLogger.network.debug("Anycubic HTTP reachability check also failed for \(ipAddress): \(error.localizedDescription)")
                 return false
             }
         }

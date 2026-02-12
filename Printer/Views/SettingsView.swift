@@ -7,6 +7,7 @@
 
 import SwiftUI
 import SwiftData
+import OSLog
 
 // MARK: - Settings View
 
@@ -51,6 +52,8 @@ struct SettingsView: View {
     @State private var dimensionAnalysisCompleted: Int = 0
     @State private var iCloudSyncStatus: String = "Checking…"
     @State private var iCloudFileCount: Int = 0
+    @State private var errorMessage: String?
+    @State private var showingError = false
 
     var body: some View {
         NavigationStack {
@@ -97,6 +100,11 @@ struct SettingsView: View {
                 Button("OK", role: .cancel) { }
             } message: {
                 Text(rescanResultMessage ?? "Scan complete.")
+            }
+            .alert("Error", isPresented: $showingError) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text(errorMessage ?? "An unknown error occurred.")
             }
             .onAppear { calculateStorage() }
         }
@@ -435,11 +443,21 @@ struct SettingsView: View {
     }
 
     private func deleteAllModels() {
+        var deleteErrors: [String] = []
         for model in models {
             Task {
-                try? await STLFileManager.shared.deleteSTL(at: model.resolvedFileURL.path)
+                do {
+                    try await STLFileManager.shared.deleteSTL(at: model.resolvedFileURL.path)
+                } catch {
+                    AppLogger.fileOps.error("Failed to delete model file \(model.name): \(error.localizedDescription)")
+                    deleteErrors.append(model.name)
+                }
             }
             modelContext.delete(model)
+        }
+        if !deleteErrors.isEmpty {
+            errorMessage = "Failed to delete files for: \(deleteErrors.joined(separator: ", "))"
+            showingError = true
         }
     }
 

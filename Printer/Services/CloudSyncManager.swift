@@ -7,6 +7,7 @@
 
 import Foundation
 import SwiftData
+import OSLog
 
 /// Manages iCloud file synchronization for 3D model files.
 ///
@@ -52,8 +53,10 @@ actor CloudSyncManager {
                 try FileManager.default.removeItem(at: iCloudURL)
             }
             try FileManager.default.copyItem(at: localURL, to: iCloudURL)
+            AppLogger.sync.info("Uploaded to iCloud: \(relativePath)")
             return true
         } catch {
+            AppLogger.sync.error("iCloud upload failed for \(relativePath): \(error.localizedDescription)")
             return false
         }
     }
@@ -88,11 +91,13 @@ actor CloudSyncManager {
                         try FileManager.default.createDirectory(at: localDir, withIntermediateDirectories: true)
                     }
                     try FileManager.default.copyItem(at: iCloudURL, to: localURL)
+                    AppLogger.sync.info("Downloaded from iCloud: \(relativePath)")
                     return true
                 }
                 try await Task.sleep(for: .seconds(1))
             }
         } catch {
+            AppLogger.sync.error("iCloud download failed for \(relativePath): \(error.localizedDescription)")
             return false
         }
 

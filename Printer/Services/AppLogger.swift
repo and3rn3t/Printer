@@ -26,4 +26,13 @@ enum AppLogger {
 
     /// File import, conversion, and mesh analysis
     static let fileOps = Logger(subsystem: "com.andernet.Printer", category: "FileOps")
+
+    /// Printer discovery (Bonjour, ACT probing, subnet scanning)
+    static let discovery = Logger(subsystem: "com.andernet.Printer", category: "Discovery")
+
+    /// Background tasks and notifications
+    static let background = Logger(subsystem: "com.andernet.Printer", category: "Background")
+
+    /// iCloud sync operations
+    static let sync = Logger(subsystem: "com.andernet.Printer", category: "Sync")
 }

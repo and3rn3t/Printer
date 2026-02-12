@@ -7,6 +7,7 @@
 
 import Foundation
 import SwiftData
+import OSLog
 #if canImport(UIKit)
 import UIKit
 #endif
@@ -60,6 +61,8 @@ actor TimelapseCapture {
     ///   - modelContext: SwiftData context for persisting snapshots
     func startCapture(snapshotURL: URL, job: PrintJob, modelContext: ModelContext) {
         guard !isCapturing else { return }
+
+        AppLogger.printJob.info("Starting timelapse capture (interval: \(self.captureInterval)s)")
 
         self.snapshotURL = snapshotURL
         self.activeJob = job
@@ -126,12 +129,16 @@ actor TimelapseCapture {
                     printJob: job
                 )
                 context.insert(snapshot)
-                try? context.save()
+                do {
+                    try context.save()
+                } catch {
+                    AppLogger.data.error("Failed to save timelapse snapshot: \(error.localizedDescription)")
+                }
             }
 
             snapshotCount += 1
         } catch {
-            // Silently skip failed captures — network glitch, printer busy, etc.
+            AppLogger.printJob.debug("Timelapse snapshot capture failed: \(error.localizedDescription)")
         }
     }
 

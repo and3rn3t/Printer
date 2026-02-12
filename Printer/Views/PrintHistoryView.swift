@@ -24,6 +24,8 @@ struct PrintHistoryView: View {
     @State private var retryJob: PrintJob?
     @State private var exportURL: URL?
     @State private var showingExportShare = false
+    @State private var errorMessage: String?
+    @State private var showingError = false
 
     // MARK: - Filter Types
 
@@ -277,6 +279,11 @@ struct PrintHistoryView: View {
                 PrintJobView(model: model, printers: retryPrinters(for: job))
             }
         }
+        .alert("Export Error", isPresented: $showingError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(errorMessage ?? "Failed to create export file.")
+        }
     }
 
     /// Build a printer list for retry
@@ -296,6 +303,11 @@ struct PrintHistoryView: View {
                     exportURL = url
                     showingExportShare = true
                 }
+            } else {
+                await MainActor.run {
+                    errorMessage = "Failed to create CSV export file."
+                    showingError = true
+                }
             }
         }
     }
@@ -310,6 +322,11 @@ struct PrintHistoryView: View {
                 await MainActor.run {
                     exportURL = url
                     showingExportShare = true
+                }
+            } else {
+                await MainActor.run {
+                    errorMessage = "Failed to create print report file."
+                    showingError = true
                 }
             }
         }

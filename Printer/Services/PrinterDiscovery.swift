@@ -8,6 +8,7 @@
 import Foundation
 import Network
 import Observation
+import OSLog
 
 // MARK: - Discovered Printer Info
 
@@ -95,6 +96,7 @@ final class PrinterDiscovery {
         stopDiscovery()
         isScanning = true
         lastError = nil
+        AppLogger.discovery.info("Starting Bonjour discovery")
         
         let parameters = NWParameters()
         parameters.includePeerToPeer = true
@@ -109,6 +111,7 @@ final class PrinterDiscovery {
                 case .ready:
                     break
                 case .failed(let error):
+                    AppLogger.discovery.error("Bonjour discovery failed: \(error.localizedDescription)")
                     self?.lastError = "Bonjour discovery failed: \(error.localizedDescription)"
                     self?.isScanning = false
                 case .cancelled:
@@ -202,6 +205,7 @@ final class PrinterDiscovery {
         let photon = PhotonPrinterService.shared
         do {
             let sysInfo = try await photon.getSystemInfo(ipAddress: ipAddress)
+            AppLogger.discovery.info("ACT probe found \(sysInfo.modelName) at \(ipAddress)")
             return DiscoveredPrinter(
                 id: sysInfo.serialNumber,
                 name: sysInfo.modelName,
@@ -214,6 +218,7 @@ final class PrinterDiscovery {
                 discoveredAt: Date()
             )
         } catch {
+            AppLogger.discovery.debug("ACT probe failed for \(ipAddress): \(error.localizedDescription)")
             return nil
         }
     }
@@ -240,6 +245,8 @@ final class PrinterDiscovery {
             
             let info = try JSONDecoder().decode(AnycubicDiscoveryResponse.self, from: data)
             
+            AppLogger.discovery.info("HTTP probe found \(info.modelName ?? "Anycubic") at \(ipAddress)")
+
             return DiscoveredPrinter(
                 id: info.deviceId ?? ipAddress,
                 name: info.modelName ?? "Anycubic Printer",
@@ -252,6 +259,7 @@ final class PrinterDiscovery {
                 discoveredAt: Date()
             )
         } catch {
+            AppLogger.discovery.debug("HTTP probe failed for \(ipAddress): \(error.localizedDescription)")
             return nil
         }
     }
@@ -265,6 +273,7 @@ final class PrinterDiscovery {
         isScanning = true
         lastError = nil
         scanProgress = 0.0
+        AppLogger.discovery.info("Starting subnet scan (base: \(baseIP ?? "auto-detect"))")
         
         scanTask = Task { [weak self] in
             guard let self else { return }
@@ -336,6 +345,7 @@ final class PrinterDiscovery {
     private func addDiscoveredPrinter(_ printer: DiscoveredPrinter) {
         if !discoveredPrinters.contains(where: { $0.ipAddress == printer.ipAddress }) {
             discoveredPrinters.append(printer)
+            AppLogger.discovery.info("Discovered printer: \(printer.name) at \(printer.ipAddress) via \(printer.discoveryMethod.rawValue)")
         }
     }
     

@@ -7,6 +7,7 @@
 
 import Foundation
 import Network
+import OSLog
 
 /// Communicates with Anycubic Photon resin printers via the ACT TCP protocol.
 ///
@@ -123,6 +124,8 @@ actor PhotonPrinterService {
         port: Int = PhotonPrinterService.defaultPort,
         command: String
     ) async throws -> [String] {
+        AppLogger.network.debug("ACT send \(command) → \(ipAddress):\(port)")
+
         // Create TCP connection
         let connection = NWConnection(
             host: NWEndpoint.Host(ipAddress),
@@ -137,6 +140,7 @@ actor PhotonPrinterService {
             connection.stateUpdateHandler = { state in
                 switch state {
                 case .failed(let error):
+                    AppLogger.network.error("ACT connection failed to \(ipAddress):\(port): \(error.localizedDescription)")
                     if resumeGuard.tryAcquire() {
                         connection.cancel()
                         continuation.resume(
@@ -355,8 +359,10 @@ actor PhotonPrinterService {
     func testConnection(ipAddress: String, port: Int = defaultPort) async throws -> Bool {
         do {
             _ = try await getStatus(ipAddress: ipAddress, port: port)
+            AppLogger.network.info("ACT connection test succeeded for \(ipAddress):\(port)")
             return true
         } catch {
+            AppLogger.network.warning("ACT connection test failed for \(ipAddress):\(port): \(error.localizedDescription)")
             return false
         }
     }
@@ -396,6 +402,8 @@ actor PhotonPrinterService {
 
     /// Probe a specific IP address to check if a Photon printer is listening on port 6000
     static func probe(ipAddress: String, port: Int = defaultPort) async -> Bool {
+        AppLogger.discovery.debug("ACT probe \(ipAddress):\(port)")
+
         let connection = NWConnection(
             host: NWEndpoint.Host(ipAddress),
             port: NWEndpoint.Port(integerLiteral: UInt16(port)),

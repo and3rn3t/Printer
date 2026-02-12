@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import OSLog
 #if canImport(UIKit)
 import UIKit
 #elseif canImport(AppKit)
@@ -105,7 +106,7 @@ actor SlicedFileParser {
                 return nil
             }
         } catch {
-            print("SlicedFileParser: Failed to parse \(ext) file: \(error.localizedDescription)")
+            AppLogger.fileOps.error("SlicedFileParser: Failed to parse \(ext) file: \(error.localizedDescription)")
             return nil
         }
     }
@@ -479,7 +480,7 @@ actor SlicedFileParser {
                 return nil
             }
         } catch {
-            print("SlicedFileParser: Failed to extract thumbnail from \(ext): \(error.localizedDescription)")
+            AppLogger.fileOps.error("SlicedFileParser: Failed to extract thumbnail from \(ext): \(error.localizedDescription)")
             return nil
         }
     }

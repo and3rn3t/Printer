@@ -7,6 +7,7 @@
 
 import Foundation
 import UniformTypeIdentifiers
+import OSLog
 
 /// Manages STL file operations including import, export, and storage
 actor STLFileManager {

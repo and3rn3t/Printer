@@ -9,6 +9,7 @@ import Foundation
 import ModelIO
 import SceneKit
 import SceneKit.ModelIO
+import OSLog
 
 /// Converts between different 3D model formats
 actor ModelConverter {
@@ -83,6 +84,7 @@ actor ModelConverter {
             
             if modelURL.pathExtension.lowercased() == "usdz" {
                 guard let loadedScene = try? SCNScene(url: modelURL, options: nil) else {
+                    AppLogger.fileOps.warning("Failed to load SCNScene from \(modelURL.lastPathComponent) for thumbnail")
                     continuation.resume(returning: nil)
                     return
                 }

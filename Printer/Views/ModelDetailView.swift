@@ -7,6 +7,7 @@
 
 import SwiftUI
 import SwiftData
+import OSLog
 
 struct ModelDetailView: View {
     @Bindable var model: PrintModel
@@ -608,7 +609,11 @@ struct ModelDetailView: View {
 
     private func deleteModel() {
         Task {
-            try? await STLFileManager.shared.deleteSTL(at: model.resolvedFileURL.path)
+            do {
+                try await STLFileManager.shared.deleteSTL(at: model.resolvedFileURL.path)
+            } catch {
+                AppLogger.fileOps.error("Failed to delete model file \(model.name): \(error.localizedDescription)")
+            }
         }
         modelContext.delete(model)
     }

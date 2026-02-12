@@ -7,6 +7,7 @@
 
 import Foundation
 import SwiftData
+import OSLog
 #if os(iOS)
 import BackgroundTasks
 #endif
@@ -52,7 +53,9 @@ actor BackgroundPrintMonitor {
         request.earliestBeginDate = Date(timeIntervalSinceNow: 5 * 60) // 5 minutes
         do {
             try BGTaskScheduler.shared.submit(request)
+            AppLogger.background.info("Scheduled background print refresh")
         } catch {
+            AppLogger.background.warning("Failed to schedule background refresh: \(error.localizedDescription)")
             // Non-fatal — background monitoring won't work, but in-app monitoring will
         }
     }
@@ -83,10 +86,16 @@ actor BackgroundPrintMonitor {
         guard let container = try? ModelContainer(
             for: Printer.self, PrintJob.self, PrintModel.self,
             configurations: ModelConfiguration(isStoredInMemoryOnly: false)
-        ) else { return false }
+        ) else {
+            AppLogger.background.error("Failed to create ModelContainer for background polling")
+            return false
+        }
 
         let context = ModelContext(container)
-        guard let printers = try? context.fetch(FetchDescriptor<Printer>()) else { return false }
+        guard let printers = try? context.fetch(FetchDescriptor<Printer>()) else {
+            AppLogger.background.error("Failed to fetch printers for background polling")
+            return false
+        }
 
         var anyActive = false
 
@@ -133,6 +142,7 @@ actor BackgroundPrintMonitor {
                 let isPrinting = status == .printing || status == .paused
                 return PrinterPollResult(isPrinting: isPrinting, progress: nil, fileName: nil, estimatedTimeRemaining: nil)
             } catch {
+                AppLogger.background.debug("Background ACT poll failed for \(printer.name): \(error.localizedDescription)")
                 return PrinterPollResult(isPrinting: false, progress: nil, fileName: nil, estimatedTimeRemaining: nil)
             }
 
@@ -146,6 +156,7 @@ actor BackgroundPrintMonitor {
                 let fileName = job.job?.file?.name
                 return PrinterPollResult(isPrinting: isPrinting, progress: progress, fileName: fileName, estimatedTimeRemaining: timeLeft)
             } catch {
+                AppLogger.background.debug("Background HTTP poll failed for \(printer.name): \(error.localizedDescription)")
                 return PrinterPollResult(isPrinting: false, progress: nil, fileName: nil, estimatedTimeRemaining: nil)
             }
 

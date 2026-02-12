@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import OSLog
 #if os(iOS)
 import ActivityKit
 #endif
@@ -49,7 +50,7 @@ final class PrintActivityManager {
             )
             currentActivity = activity
         } catch {
-            print("Failed to start Live Activity: \(error.localizedDescription)")
+            AppLogger.app.error("Failed to start Live Activity: \(error.localizedDescription)")
         }
         #endif
     }
